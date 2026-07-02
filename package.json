@@ -1,0 +1,14 @@
+{
+  "name": "tram-cafe-voice-order",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vietnamese voice order MVP for a cafe, with kitchen board and daily revenue.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check app.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

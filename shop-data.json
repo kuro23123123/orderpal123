@@ -1,0 +1,939 @@
+{
+  "sequence": 20,
+  "menu": [
+    {
+      "id": "m_phin_den_da",
+      "name": "Phin Đen Đá",
+      "aliases": [
+        "phin den da",
+        "đen đá",
+        "den da",
+        "đen",
+        "den",
+        "cafe đen",
+        "cafe phin đen đá",
+        "cà phê phin đen đá",
+        "cà phê đá"
+      ],
+      "active": true,
+      "prices": {
+        "S": 16,
+        "M": 20
+      }
+    },
+    {
+      "id": "m_phin_sua_da",
+      "name": "Phin Sữa Đá",
+      "aliases": [
+        "phin sua da",
+        "sữa",
+        "sua",
+        "sữa đá",
+        "sua da",
+        "cafe sữa",
+        "cafe sua",
+        "cafe phin sữa đá",
+        "cà phê phin sữa đá",
+        "cà phê sữa",
+        "ca phe sua",
+        "cà phê sữa đá",
+        "ca phe sua da"
+      ],
+      "active": true,
+      "prices": {
+        "S": 18,
+        "M": 22
+      }
+    },
+    {
+      "id": "m_phin_bac_xiu",
+      "name": "Phin Bạc Xỉu",
+      "aliases": [
+        "phin bac xiu",
+        "bạc xỉu",
+        "bac xiu"
+      ],
+      "active": true,
+      "prices": {
+        "S": 18,
+        "M": 22
+      }
+    },
+    {
+      "id": "m_phin_sua_tuoi",
+      "name": "Phin Sữa Tươi",
+      "aliases": [
+        "phin sua tuoi",
+        "cà phê sữa tươi",
+        "cafe sữa tươi"
+      ],
+      "active": true,
+      "prices": {
+        "S": 19,
+        "M": 23
+      }
+    },
+    {
+      "id": "m_phin_sua_ca_cao",
+      "name": "Phin Sữa Ca Cao",
+      "aliases": [
+        "phin sua ca cao",
+        "cà phê sữa ca cao",
+        "cafe sữa cacao"
+      ],
+      "active": true,
+      "prices": {
+        "S": 22,
+        "M": 27
+      }
+    },
+    {
+      "id": "m_cold_brew_truyen_thong",
+      "name": "Cold Brew Truyền Thống",
+      "aliases": [
+        "cold brew truyen thong",
+        "cold brew thường",
+        "cold brew"
+      ],
+      "active": true,
+      "prices": {
+        "S": 20,
+        "M": 25
+      }
+    },
+    {
+      "id": "m_cold_brew_chanh",
+      "name": "Cold Brew Chanh",
+      "aliases": [
+        "cold brew chanh"
+      ],
+      "active": true,
+      "prices": {
+        "M": 25
+      }
+    },
+    {
+      "id": "m_cold_brew_sua_tuoi",
+      "name": "Cold Brew Sữa Tươi",
+      "aliases": [
+        "cold brew sua tuoi",
+        "cold brew sữa"
+      ],
+      "active": true,
+      "prices": {
+        "M": 25
+      }
+    },
+    {
+      "id": "m_cafe_muoi",
+      "name": "Cafe Muối",
+      "aliases": [
+        "cafe muoi",
+        "muối",
+        "muoi",
+        "cà phê muối",
+        "ca phe muoi"
+      ],
+      "active": true,
+      "prices": {
+        "S": 20,
+        "M": 25
+      }
+    },
+    {
+      "id": "m_capuchino",
+      "name": "Capuchino",
+      "aliases": [
+        "capuchino",
+        "cappuccino",
+        "ca pu chi no"
+      ],
+      "active": true,
+      "prices": {
+        "S": 22,
+        "M": 27
+      }
+    },
+    {
+      "id": "m_latte_hanh_nhan",
+      "name": "Latte Vị Hạnh Nhân",
+      "aliases": [
+        "latte hạnh nhân",
+        "latte hanh nhan",
+        "la tê hạnh nhân"
+      ],
+      "active": true,
+      "prices": {
+        "S": 22,
+        "M": 27
+      }
+    },
+    {
+      "id": "m_latte_hat_phi",
+      "name": "Latte Vị Hạt Phỉ",
+      "aliases": [
+        "latte hạt phỉ",
+        "latte hat phi",
+        "la tê hạt phỉ"
+      ],
+      "active": true,
+      "prices": {
+        "S": 22,
+        "M": 27
+      }
+    },
+    {
+      "id": "m_latte_caramel",
+      "name": "Latte Vị Caramel",
+      "aliases": [
+        "latte caramel",
+        "la tê caramel"
+      ],
+      "active": true,
+      "prices": {
+        "S": 22,
+        "M": 27
+      }
+    },
+    {
+      "id": "m_latte_chocolate",
+      "name": "Latte Vị Chocolate",
+      "aliases": [
+        "latte chocolate",
+        "latte socola",
+        "la tê chocolate"
+      ],
+      "active": true,
+      "prices": {
+        "S": 22,
+        "M": 27
+      }
+    },
+    {
+      "id": "m_machiato_latte",
+      "name": "Machiato Latte",
+      "aliases": [
+        "macchiato latte",
+        "machiato la tê",
+        "macchiato la tê"
+      ],
+      "active": true,
+      "prices": {
+        "S": 22,
+        "M": 27
+      }
+    },
+    {
+      "id": "m_machiato_caramel",
+      "name": "Machiato Caramel",
+      "aliases": [
+        "macchiato caramel"
+      ],
+      "active": true,
+      "prices": {
+        "S": 22,
+        "M": 27
+      }
+    },
+    {
+      "id": "m_machiato_la_dua",
+      "name": "Machiato Lá Dứa",
+      "aliases": [
+        "macchiato lá dứa",
+        "machiato la dua",
+        "macchiato la dua"
+      ],
+      "active": true,
+      "prices": {
+        "S": 22,
+        "M": 27
+      }
+    },
+    {
+      "id": "m_latte_latte_sua_yen_mach",
+      "name": "Latte Latte Sữa Yến Mạch",
+      "aliases": [
+        "latte latte",
+        "latte sữa yến mạch",
+        "latte sua yen mach"
+      ],
+      "active": true,
+      "prices": {
+        "M": 27
+      }
+    },
+    {
+      "id": "m_cacao_sua_da",
+      "name": "Cacao Sữa Đá",
+      "aliases": [
+        "cacao sua da",
+        "ca cao sữa đá"
+      ],
+      "active": true,
+      "prices": {
+        "S": 20,
+        "M": 25
+      }
+    },
+    {
+      "id": "m_cacao_sua_tuoi",
+      "name": "Cacao Sữa Tươi",
+      "aliases": [
+        "cacao sua tuoi",
+        "ca cao sữa tươi"
+      ],
+      "active": true,
+      "prices": {
+        "S": 20,
+        "M": 25
+      }
+    },
+    {
+      "id": "m_cacao_bac_ha",
+      "name": "Cacao Bạc Hà",
+      "aliases": [
+        "cacao bac ha",
+        "ca cao bạc hà"
+      ],
+      "active": true,
+      "prices": {
+        "M": 27
+      }
+    },
+    {
+      "id": "m_tra_sua_trams",
+      "name": "Trà Sữa Trạm's",
+      "aliases": [
+        "tra sua tram",
+        "trà sữa trạm",
+        "tra sua trams"
+      ],
+      "active": true,
+      "prices": {
+        "L": 22
+      }
+    },
+    {
+      "id": "m_hong_tra_sua",
+      "name": "Hồng Trà Sữa",
+      "aliases": [
+        "hong tra sua"
+      ],
+      "active": true,
+      "prices": {
+        "L": 22
+      }
+    },
+    {
+      "id": "m_oolong_sua",
+      "name": "Oolong Sữa",
+      "aliases": [
+        "oolong sua",
+        "ô long sữa"
+      ],
+      "active": true,
+      "prices": {
+        "L": 22
+      }
+    },
+    {
+      "id": "m_oolong_chanh_mat_ong",
+      "name": "Oolong Chanh Mật Ong",
+      "aliases": [
+        "oolong chanh mat ong",
+        "ô long chanh mật ong"
+      ],
+      "active": true,
+      "prices": {
+        "M": 22,
+        "L": 25
+      }
+    },
+    {
+      "id": "m_hong_tra_dao",
+      "name": "Hồng Trà Đào",
+      "aliases": [
+        "hong tra dao",
+        "trà đào"
+      ],
+      "active": true,
+      "prices": {
+        "M": 25
+      }
+    },
+    {
+      "id": "m_hong_tra_thao_moc",
+      "name": "Hồng Trà Thảo Mộc",
+      "aliases": [
+        "hong tra thao moc"
+      ],
+      "active": true,
+      "prices": {
+        "M": 27
+      }
+    },
+    {
+      "id": "m_tra_lai_vai",
+      "name": "Trà Lài Vải",
+      "aliases": [
+        "tra lai vai",
+        "trà vải",
+        "tra vai",
+        "lài vải",
+        "lai vai",
+        "trà lài vải",
+        "trà lài",
+        "tra lai"
+      ],
+      "active": true,
+      "prices": {
+        "M": 27
+      }
+    },
+    {
+      "id": "m_tra_lai_dac_thom",
+      "name": "Trà Lài Đác Thơm",
+      "aliases": [
+        "tra lai dac thom",
+        "đác thơm",
+        "dac thom",
+        "trà lài đắc thơm"
+      ],
+      "active": true,
+      "prices": {
+        "M": 27
+      }
+    },
+    {
+      "id": "m_tra_lai_cam_dac",
+      "name": "Trà Lài Cam Đác",
+      "aliases": [
+        "tra lai cam dac",
+        "trà lài cam đắc"
+      ],
+      "active": true,
+      "prices": {
+        "M": 27
+      }
+    },
+    {
+      "id": "m_tra_sen_cold_brew_tao",
+      "name": "Trà Sen Cold Brew Vị Táo",
+      "aliases": [
+        "tra sen cold brew vi tao",
+        "trà sen cold brew táo"
+      ],
+      "active": true,
+      "prices": {
+        "M": 25
+      }
+    },
+    {
+      "id": "m_tra_oolong_cold_brew_mo_dao",
+      "name": "Trà Oolong Cold Brew Vị Mơ Đào",
+      "aliases": [
+        "tra oolong cold brew vi mo dao",
+        "oolong cold brew mơ đào"
+      ],
+      "active": true,
+      "prices": {
+        "M": 28
+      }
+    }
+  ],
+  "orders": [
+    {
+      "id": "ORD-0020",
+      "createdAt": "2026-07-02T08:19:41.948Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "businessDate": "2026-07-02",
+      "status": "done",
+      "hiddenFromKitchen": false,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_sua_da",
+          "name": "Phin Sữa Đá",
+          "quantity": 1,
+          "size": "M",
+          "taste": "ngọt",
+          "ice": "ít đá",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "ngọt",
+          "unitPrice": 22
+        }
+      ]
+    },
+    {
+      "id": "ORD-0019",
+      "createdAt": "2026-07-02T03:38:39.957Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "hiddenFromKitchen": false,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_den_da",
+          "name": "Phin Đen Đá",
+          "quantity": 1,
+          "size": "M",
+          "taste": "không đường",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": true,
+          "container": "bình riêng",
+          "note": "không đường",
+          "unitPrice": 20
+        }
+      ]
+    },
+    {
+      "id": "ORD-0018",
+      "createdAt": "2026-07-02T03:37:18.815Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "new",
+      "hiddenFromKitchen": false,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_sua_da",
+          "name": "Phin Sữa Đá",
+          "quantity": 1,
+          "size": "M",
+          "taste": "ít ngọt",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "ít ngọt",
+          "unitPrice": 22
+        }
+      ]
+    },
+    {
+      "id": "ORD-0017",
+      "createdAt": "2026-07-02T00:13:24.052Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "new",
+      "hiddenFromKitchen": false,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_den_da",
+          "name": "Phin Đen Đá",
+          "quantity": 1,
+          "size": "L",
+          "taste": "vừa",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "vừa",
+          "unitPrice": 20
+        }
+      ]
+    },
+    {
+      "id": "ORD-0016",
+      "createdAt": "2026-07-02T00:08:52.779Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "new",
+      "hiddenFromKitchen": false,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_bac_xiu",
+          "name": "Phin Bạc Xỉu",
+          "quantity": 1,
+          "size": "L",
+          "taste": "vừa",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "vừa",
+          "unitPrice": 22
+        }
+      ]
+    },
+    {
+      "id": "ORD-0015",
+      "createdAt": "2026-07-02T00:07:05.724Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "new",
+      "hiddenFromKitchen": false,
+      "note": "",
+      "items": [
+        {
+          "id": "m_cafe_muoi",
+          "name": "Cafe Muối",
+          "quantity": 1,
+          "size": "L",
+          "taste": "vừa",
+          "ice": "vừa",
+          "prep": "đánh kem",
+          "ownBottle": false,
+          "container": "",
+          "note": "vừa",
+          "unitPrice": 25
+        }
+      ]
+    },
+    {
+      "id": "ORD-0014",
+      "createdAt": "2026-07-02T00:04:28.891Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "hiddenFromKitchen": true,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_sua_da",
+          "name": "Phin Sữa Đá",
+          "quantity": 1,
+          "size": "M",
+          "taste": "ít ngọt",
+          "ice": "ít đá",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "ít ngọt",
+          "unitPrice": 22
+        }
+      ]
+    },
+    {
+      "id": "ORD-0013",
+      "createdAt": "2026-07-01T23:54:52.561Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "hiddenFromKitchen": true,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_bac_xiu",
+          "name": "Phin Bạc Xỉu",
+          "quantity": 20,
+          "size": "M",
+          "taste": "ngọt",
+          "ice": "ít đá",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "ngọt",
+          "unitPrice": 22
+        }
+      ],
+      "updatedAt": "2026-07-01T23:55:40.089Z",
+      "editedBy": "Máy nhân viên"
+    },
+    {
+      "id": "ORD-0012",
+      "createdAt": "2026-07-01T23:52:20.197Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "hiddenFromKitchen": true,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_sua_da",
+          "name": "Phin Sữa Đá",
+          "quantity": 1,
+          "size": "S",
+          "taste": "vừa",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "vừa",
+          "unitPrice": 18
+        }
+      ]
+    },
+    {
+      "id": "ORD-0011",
+      "createdAt": "2026-07-01T15:15:56.331Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "hiddenFromKitchen": true,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_sua_da",
+          "name": "Phin Sữa Đá",
+          "quantity": 1,
+          "size": "M",
+          "taste": "không đường",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "không đường",
+          "unitPrice": 22
+        }
+      ]
+    },
+    {
+      "id": "ORD-0010",
+      "createdAt": "2026-07-01T15:02:08.113Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "hiddenFromKitchen": true,
+      "note": "",
+      "items": [
+        {
+          "id": "m_cacao_sua_da",
+          "name": "Cacao Sữa Đá",
+          "quantity": 1,
+          "size": "M",
+          "taste": "vừa",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "vừa",
+          "unitPrice": 25
+        }
+      ]
+    },
+    {
+      "id": "ORD-0009",
+      "createdAt": "2026-07-01T15:01:53.485Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "hiddenFromKitchen": true,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_sua_da",
+          "name": "Phin Sữa Đá",
+          "quantity": 1,
+          "size": "M",
+          "taste": "không đường",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "không đường",
+          "unitPrice": 22
+        }
+      ]
+    },
+    {
+      "id": "ORD-0008",
+      "createdAt": "2026-07-01T14:36:07.648Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "hiddenFromKitchen": true,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_den_da",
+          "name": "Phin Đen Đá",
+          "quantity": 1,
+          "size": "M",
+          "taste": "vừa",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "vừa",
+          "unitPrice": 20
+        }
+      ]
+    },
+    {
+      "id": "ORD-0007",
+      "createdAt": "2026-07-01T14:00:56.262Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "hiddenFromKitchen": true,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_bac_xiu",
+          "name": "Phin Bạc Xỉu",
+          "quantity": 1,
+          "size": "M",
+          "taste": "vừa",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": true,
+          "container": "bình riêng",
+          "note": "vừa",
+          "unitPrice": 22
+        },
+        {
+          "id": "m_cacao_bac_ha",
+          "name": "Cacao Bạc Hà",
+          "quantity": 1,
+          "size": "M",
+          "taste": "vừa",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "vừa",
+          "unitPrice": 27
+        }
+      ],
+      "updatedAt": "2026-07-01T14:26:24.395Z",
+      "editedBy": "Máy nhân viên"
+    },
+    {
+      "id": "ORD-0006",
+      "createdAt": "2026-07-01T14:00:08.871Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "hiddenFromKitchen": true,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_den_da",
+          "name": "Phin Đen Đá",
+          "quantity": 1,
+          "size": "M",
+          "taste": "ngọt",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "ngọt",
+          "unitPrice": 20
+        },
+        {
+          "id": "m_tra_lai_vai",
+          "name": "Trà Lài Vải",
+          "quantity": 1,
+          "size": "M",
+          "taste": "vừa",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "vừa",
+          "unitPrice": 27
+        }
+      ]
+    },
+    {
+      "id": "ORD-0005",
+      "createdAt": "2026-07-01T13:41:51.775Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "hiddenFromKitchen": true,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_sua_da",
+          "name": "Phin Sữa Đá",
+          "quantity": 2,
+          "size": "M",
+          "taste": "ngọt",
+          "ice": "ít đá",
+          "prep": "",
+          "note": "ngọt",
+          "unitPrice": 22
+        },
+        {
+          "id": "m_tra_lai_vai",
+          "name": "Trà Lài Vải",
+          "quantity": 1,
+          "size": "M",
+          "taste": "vừa",
+          "ice": "vừa",
+          "prep": "",
+          "note": "vừa",
+          "unitPrice": 27
+        }
+      ]
+    },
+    {
+      "id": "ORD-0004",
+      "createdAt": "2026-06-30T13:47:09.512Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_sua_da",
+          "name": "Phin Sữa Đá",
+          "quantity": 1,
+          "size": "S",
+          "taste": "ít ngọt",
+          "ice": "vừa",
+          "prep": "",
+          "note": "ít ngọt"
+        }
+      ],
+      "hiddenFromKitchen": true
+    },
+    {
+      "id": "ORD-0003",
+      "createdAt": "2026-06-30T13:31:55.683Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_sua_da",
+          "name": "Phin Sữa Đá",
+          "quantity": 1,
+          "taste": "ngọt",
+          "ice": "vừa",
+          "note": "ngọt"
+        },
+        {
+          "id": "m_phin_bac_xiu",
+          "name": "Phin Bạc Xỉu",
+          "quantity": 1,
+          "taste": "ít ngọt",
+          "ice": "nhiều đá",
+          "note": "ít ngọt"
+        }
+      ],
+      "hiddenFromKitchen": true
+    },
+    {
+      "id": "ORD-0001",
+      "createdAt": "2026-06-30T13:05:32.934Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "status": "done",
+      "note": "",
+      "items": [
+        {
+          "id": "m_ca_phe_sua_da",
+          "name": "Cà phê sữa đá",
+          "quantity": 2
+        },
+        {
+          "id": "m_bac_xiu",
+          "name": "Bạc xỉu",
+          "quantity": 1
+        }
+      ],
+      "hiddenFromKitchen": true
+    }
+  ]
+}

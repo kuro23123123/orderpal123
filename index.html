@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#176f64">
+    <title>Ghi Món Bằng Giọng Nói</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="styles.css?v=sizes2">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">GM</div>
+          <div>
+            <h1>Ghi Món</h1>
+            <p>Order tiếng Việt cho quán cà phê.</p>
+          </div>
+        </div>
+
+        <nav class="view-tabs" aria-label="App views">
+          <button class="tab is-active" type="button" data-view-button="waiter">Nhân viên</button>
+          <button class="tab" type="button" data-view-button="kitchen">Bếp</button>
+          <button class="tab" type="button" data-view-button="revenue">Doanh thu</button>
+          <button class="tab" type="button" data-view-button="menu">Menu</button>
+        </nav>
+      </header>
+
+      <main class="main-grid">
+        <div class="sync-banner" id="sync-banner" role="status" aria-live="polite">Đang mở trạm order local...</div>
+
+        <section class="view is-active" id="waiter-view" data-view="waiter" aria-labelledby="waiter-title">
+          <div class="view-header">
+            <div>
+              <h2 id="waiter-title">Nhân viên</h2>
+            </div>
+          </div>
+
+          <div class="waiter-layout">
+            <section class="panel text-entry-panel" aria-labelledby="voice-title">
+              <div class="panel-heading">
+                <h3 id="voice-title">Nhập món</h3>
+              </div>
+
+              <div class="voice-control-bar">
+                <button class="voice-action" type="button" id="direct-order">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <path d="M12 19v3"></path>
+                  </svg>
+                  Nói món
+                </button>
+                <button type="button" id="stop-listening" disabled>Dừng</button>
+                <span class="state-pill" id="voice-state">Chờ</span>
+              </div>
+
+              <div class="meter"><span id="meter-bar"></span></div>
+              <p class="voice-help" id="speech-support">Bấm Nói món, nói tên món, app sẽ tự tách ra Order nháp sau khi bạn ngừng nói khoảng 1 giây.</p>
+
+              <label class="field-label" for="transcript-input">Nội dung order</label>
+              <textarea id="transcript-input" rows="7" spellcheck="false" autocapitalize="sentences" placeholder="Ví dụ: Ghi món, hai cà phê sữa đá và một bạc xỉu"></textarea>
+
+              <div class="control-row">
+                <button type="button" id="parse-transcript">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m5 12 5 5L20 7"></path>
+                  </svg>
+                  Tách món
+                </button>
+                <button type="button" id="clear-draft">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 6h18"></path>
+                    <path d="M8 6V4h8v2"></path>
+                    <path d="m19 6-1 14H6L5 6"></path>
+                  </svg>
+                  Xóa
+                </button>
+              </div>
+            </section>
+
+            <div class="hidden-voice-controls" aria-hidden="true" hidden>
+              <button type="button" id="start-wake">Chờ câu gọi</button>
+            </div>
+
+            <section class="panel draft-panel" aria-labelledby="draft-title">
+              <div class="panel-heading">
+                <h3 id="draft-title">Order nháp</h3>
+                <span id="draft-count">0 món</span>
+              </div>
+
+              <div class="notice" id="draft-notice">Chưa có món nháp.</div>
+              <div class="draft-list" id="draft-list"></div>
+
+              <label class="field-label" for="order-note">Ghi chú</label>
+              <input id="order-note" type="text" autocomplete="off" placeholder="Ví dụ: ít đá, ít đường">
+
+              <div class="order-meta-grid">
+                <label>
+                  <span class="field-label">Ngày bán</span>
+                  <input id="order-date" type="date">
+                </label>
+                <label>
+                  <span class="field-label">Tên khách / bàn</span>
+                  <input id="order-label" type="text" autocomplete="off" inputmode="text" placeholder="Ví dụ: bàn 2, anh Nam">
+                </label>
+                <input id="device-name" type="hidden" value="">
+              </div>
+
+              <div class="post-row">
+                <button class="danger-action" type="button" id="delete-order" hidden>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 6h18"></path>
+                    <path d="M8 6V4h8v2"></path>
+                    <path d="m19 6-1 14H6L5 6"></path>
+                  </svg>
+                  Xóa order
+                </button>
+                <button class="primary-action" type="button" id="post-order" disabled>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M22 2 11 13"></path>
+                    <path d="m22 2-7 20-4-9-9-4 20-7Z"></path>
+                  </svg>
+                  Gửi bếp
+                </button>
+                <span id="post-feedback" role="status" aria-live="polite"></span>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="kitchen-view" data-view="kitchen" aria-labelledby="kitchen-title">
+          <div class="view-header">
+            <div>
+              <h2 id="kitchen-title">Bếp</h2>
+              <p>Danh sách order chung.</p>
+            </div>
+          </div>
+
+          <div class="kitchen-board" id="kitchen-board"></div>
+        </section>
+
+        <section class="view" id="revenue-view" data-view="revenue" aria-labelledby="revenue-title">
+          <div class="view-header">
+            <div>
+              <h2 id="revenue-title">Doanh thu</h2>
+              <p>Tổng kết theo order đã gửi trong ngày.</p>
+            </div>
+            <label class="date-filter">
+              <span>Ngày</span>
+              <input id="revenue-date" type="date">
+            </label>
+          </div>
+
+          <section class="revenue-summary" aria-label="Tổng kết doanh thu">
+            <div class="metric">
+              <span>Doanh thu</span>
+              <strong id="revenue-total">0đ</strong>
+            </div>
+            <div class="metric">
+              <span>Order</span>
+              <strong id="revenue-orders">0</strong>
+            </div>
+            <div class="metric">
+              <span>Ly dùng</span>
+              <strong id="revenue-items">0</strong>
+            </div>
+            <div class="metric">
+              <span>Size S</span>
+              <strong id="revenue-size-s">0</strong>
+            </div>
+            <div class="metric">
+              <span>Size M</span>
+              <strong id="revenue-size-m">0</strong>
+            </div>
+            <div class="metric">
+              <span>Size L</span>
+              <strong id="revenue-size-l">0</strong>
+            </div>
+            <div class="metric">
+              <span>Bình riêng</span>
+              <strong id="revenue-own-bottles">0</strong>
+            </div>
+          </section>
+
+          <section class="panel revenue-panel" aria-labelledby="revenue-breakdown-title">
+            <div class="panel-heading">
+              <h3 id="revenue-breakdown-title">Món đã bán</h3>
+            </div>
+            <div class="empty-state" id="revenue-empty">Chưa có order trong ngày này.</div>
+            <div class="revenue-list" id="revenue-breakdown"></div>
+          </section>
+        </section>
+
+        <section class="view" id="menu-view" data-view="menu" aria-labelledby="menu-title">
+          <div class="view-header">
+            <div>
+              <h2 id="menu-title">Menu</h2>
+              <p>Danh sách món để app nhận giọng nói.</p>
+            </div>
+          </div>
+
+          <section class="panel menu-editor" aria-labelledby="menu-editor-title">
+            <div class="panel-heading">
+              <h3 id="menu-editor-title">Thêm món</h3>
+            </div>
+            <form class="menu-form" id="menu-form">
+              <label>
+                <span>Tên món</span>
+                <input id="menu-name" type="text" autocomplete="off" required placeholder="Cà phê sữa đá">
+              </label>
+              <label>
+                <span>Tên gọi khác</span>
+                <input id="menu-aliases" type="text" autocomplete="off" placeholder="ca phe sua da, nâu đá">
+              </label>
+              <button class="primary-action" type="submit">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14"></path>
+                  <path d="M5 12h14"></path>
+                </svg>
+                Thêm món
+              </button>
+            </form>
+          </section>
+
+          <div class="menu-list" id="menu-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js?v=sizes2"></script>
+  </body>
+</html>

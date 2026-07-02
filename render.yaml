@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: tram-cafe-voice-order
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SHOP_DATA_FILE
+        value: /var/data/shop-data.json
+    disk:
+      name: tram-cafe-data
+      mountPath: /var/data
+      sizeGB: 1
