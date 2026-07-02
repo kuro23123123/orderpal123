@@ -1,5 +1,5 @@
 {
-  "sequence": 20,
+  "sequence": 22,
   "menu": [
     {
       "id": "m_phin_den_da",
@@ -437,11 +437,62 @@
       ],
       "active": true,
       "prices": {
+        "L": 28,
         "M": 28
       }
     }
   ],
   "orders": [
+    {
+      "id": "ORD-0022",
+      "createdAt": "2026-07-02T15:49:55.090Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "businessDate": "2026-07-02",
+      "status": "done",
+      "hiddenFromKitchen": true,
+      "note": "",
+      "items": [
+        {
+          "id": "m_tra_lai_dac_thom",
+          "name": "Trà Lài Đác Thơm",
+          "quantity": 1,
+          "size": "M",
+          "taste": "vừa",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": false,
+          "container": "",
+          "note": "vừa",
+          "unitPrice": 27
+        }
+      ]
+    },
+    {
+      "id": "ORD-0021",
+      "createdAt": "2026-07-02T15:49:13.297Z",
+      "createdBy": "Máy nhân viên",
+      "label": "",
+      "businessDate": "2026-07-02",
+      "status": "done",
+      "hiddenFromKitchen": true,
+      "note": "",
+      "items": [
+        {
+          "id": "m_phin_sua_da",
+          "name": "Phin Sữa Đá",
+          "quantity": 1,
+          "size": "S",
+          "taste": "vừa",
+          "ice": "vừa",
+          "prep": "",
+          "ownBottle": true,
+          "container": "bình riêng",
+          "note": "vừa",
+          "unitPrice": 18
+        }
+      ]
+    },
     {
       "id": "ORD-0020",
       "createdAt": "2026-07-02T08:19:41.948Z",
@@ -449,7 +500,7 @@
       "label": "",
       "businessDate": "2026-07-02",
       "status": "done",
-      "hiddenFromKitchen": false,
+      "hiddenFromKitchen": true,
       "note": "",
       "items": [
         {
@@ -473,7 +524,7 @@
       "createdBy": "Máy nhân viên",
       "label": "",
       "status": "done",
-      "hiddenFromKitchen": false,
+      "hiddenFromKitchen": true,
       "note": "",
       "items": [
         {
@@ -496,8 +547,8 @@
       "createdAt": "2026-07-02T03:37:18.815Z",
       "createdBy": "Máy nhân viên",
       "label": "",
-      "status": "new",
-      "hiddenFromKitchen": false,
+      "status": "done",
+      "hiddenFromKitchen": true,
       "note": "",
       "items": [
         {
@@ -520,8 +571,8 @@
       "createdAt": "2026-07-02T00:13:24.052Z",
       "createdBy": "Máy nhân viên",
       "label": "",
-      "status": "new",
-      "hiddenFromKitchen": false,
+      "status": "done",
+      "hiddenFromKitchen": true,
       "note": "",
       "items": [
         {
@@ -544,8 +595,8 @@
       "createdAt": "2026-07-02T00:08:52.779Z",
       "createdBy": "Máy nhân viên",
       "label": "",
-      "status": "new",
-      "hiddenFromKitchen": false,
+      "status": "done",
+      "hiddenFromKitchen": true,
       "note": "",
       "items": [
         {
@@ -568,8 +619,8 @@
       "createdAt": "2026-07-02T00:07:05.724Z",
       "createdBy": "Máy nhân viên",
       "label": "",
-      "status": "new",
-      "hiddenFromKitchen": false,
+      "status": "done",
+      "hiddenFromKitchen": true,
       "note": "",
       "items": [
         {

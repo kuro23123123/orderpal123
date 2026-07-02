@@ -730,3 +730,16 @@ Understanding checklist:
 - [x] Solution: `/api/health` was added for cloud health checks.
 - [x] Solution: `package.json`, `render.yaml`, `.gitignore`, and `CLOUD_DEPLOY.md` were added.
 - [x] Tradeoff: using a persistent disk on Render may require a paid plan; without persistence, data may reset on restart.
+
+## Stage 22: Voice Shortcut Language Design
+
+Started designing solution 1: a fixed shop-specific voice ordering language.
+
+Understanding checklist:
+
+- [x] Problem: fully natural speech is too unreliable during crowded shifts because noise, speed, accent, and filler words create too many variables.
+- [x] Product decision: make staff speak in a short fixed pattern instead of expecting AI to understand every natural sentence.
+- [x] Solution artifact: `VOICE_SHORTCUT_DESIGN.md` defines the order grammar, option vocabulary, and a fill-in worksheet for menu shortcuts.
+- [x] Design decision: owner and staff must fill the approved dish shortcuts together because they know the real words used during service.
+- [x] Edge case: every menu item should have one primary shortcut and only a few approved secondary shortcuts to avoid confusion.
+- [x] Impact: once the shortcut table is filled, the parser can be made stricter, faster, and less error-prone.
