@@ -175,8 +175,8 @@
     { label: "vừa", phrases: ["vừa", "vua", "bình thường", "binh thuong", "vừa ngọt", "vua ngot"] }
   ];
   var iceNoteRules = [
-    { label: "ít đá", phrases: ["ít đá", "it da", "bớt đá", "bot da"] },
-    { label: "nhiều đá", phrases: ["nhiều đá", "nhieu da", "thêm đá", "them da"] },
+    { label: "ít đá", phrases: ["ít đá", "it da", "bớt đá", "bot da", "đá ít", "da it", "đá bớt", "da bot"] },
+    { label: "nhiều đá", phrases: ["nhiều đá", "nhieu da", "thêm đá", "them da", "đá nhiều", "da nhieu", "đá thêm", "da them"] },
     { label: "vừa", phrases: ["đá vừa", "da vua", "vừa đá", "vua da", "bình thường", "binh thuong"] }
   ];
   var sizeNoteRules = [
@@ -835,7 +835,15 @@
   }
 
   function extractIceNote(segment) {
-    return extractOptionLabel(segment, iceNoteRules, DEFAULT_ICE_NOTE);
+    var matches = collectOptionMatches(segment, iceNoteRules);
+    if (!matches.length) {
+      return DEFAULT_ICE_NOTE;
+    }
+
+    matches.sort(function (a, b) {
+      return a.position - b.position;
+    });
+    return matches[matches.length - 1].label;
   }
 
   function extractSizeNote(segment, fallback, itemLike) {
@@ -852,8 +860,17 @@
   }
 
   function extractOptionLabel(segment, rules, fallback) {
+    var matches = collectOptionMatches(segment, rules);
+    var bestMatch = matches.sort(function (a, b) {
+      return a.position - b.position;
+    })[0];
+
+    return bestMatch ? bestMatch.label : fallback;
+  }
+
+  function collectOptionMatches(segment, rules) {
     var foldedSegment = foldText(segment);
-    var bestMatch = null;
+    var matches = [];
 
     rules.forEach(function (rule) {
       rule.phrases.forEach(function (phrase) {
@@ -862,18 +879,15 @@
         var match;
 
         while ((match = regex.exec(foldedSegment)) !== null) {
-          var start = match.index + match[1].length;
-          if (!bestMatch || start < bestMatch.position) {
-            bestMatch = {
-              label: rule.label,
-              position: start
-            };
-          }
+          matches.push({
+            label: rule.label,
+            position: match.index + match[1].length
+          });
         }
       });
     });
 
-    return bestMatch ? bestMatch.label : fallback;
+    return matches;
   }
 
   function extractAllOptionLabels(segment, rules) {

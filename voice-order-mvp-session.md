@@ -743,3 +743,14 @@ Understanding checklist:
 - [x] Design decision: owner and staff must fill the approved dish shortcuts together because they know the real words used during service.
 - [x] Edge case: every menu item should have one primary shortcut and only a few approved secondary shortcuts to avoid confusion.
 - [x] Impact: once the shortcut table is filled, the parser can be made stricter, faster, and less error-prone.
+
+## Stage 23: Stronger Ice Note Recognition
+
+Fixed ice-note recognition for spoken phrases like `ít đá` and `nhiều đá`.
+
+Understanding checklist:
+
+- [x] Problem: staff could say ice notes, but the order could still show the default `vừa`.
+- [x] Solution: ice-note phrases now include both normal and reversed forms, such as `ít đá`, `đá ít`, `nhiều đá`, and `đá nhiều`.
+- [x] Solution: if staff says two ice notes while correcting themselves, the parser uses the last one spoken.
+- [x] Impact: the third order column should now record `ít đá` or `nhiều đá` more reliably.
