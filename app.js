@@ -420,7 +420,7 @@
       }
 
       if (interimText.trim() && !voiceCommandProcessing) {
-        var previewText = (activeTranscript + " " + interimText.trim()).trim();
+        var previewText = buildSpeechPreview(activeTranscript, interimText.trim());
         els.transcript.value = previewText;
         handleVoiceCommandIfPresent(previewText);
       }
@@ -598,9 +598,13 @@
       clearVoiceAutoFinishTimer();
       activeTranscript = "";
       els.transcript.value = sentOrderCommand.rawRest;
-      applySentOrderEditCommand(sentOrderCommand.order, sentOrderCommand.editCommand).then(function (message) {
-        restartOrderListeningAfterCommand(message);
-      });
+      applySentOrderEditCommand(sentOrderCommand.order, sentOrderCommand.editCommand)
+        .then(function (message) {
+          restartOrderListeningAfterCommand(message);
+        })
+        .catch(function () {
+          restartOrderListeningAfterCommand("Chưa sửa được order đã gửi. Kiểm tra kết nối rồi nói lại.");
+        });
       return true;
     }
 
@@ -1003,18 +1007,18 @@
   }
 
   function findSentOrderEditCommand(rawText) {
-    var foldedText = foldText(rawText || "").replace(/^sua\s+/u, "").trim();
-    var match = /^(order|don|đơn)\s+(\d+)\s*/u.exec(foldedText);
-    if (!match) {
+    var foldedText = foldText(rawText || "");
+    var orderRef = parseSpokenOrderReference(foldedText);
+    if (!orderRef) {
       return null;
     }
 
-    var order = findOrderBySpokenNumber(match[2]);
+    var order = orderRef.latest ? findLatestOrder() : findOrderBySpokenNumber(orderRef.value);
     if (!order) {
       return null;
     }
 
-    var rawRest = stripLeadingCommandPunctuation(foldedText.slice(match[0].length).trim());
+    var rawRest = stripLeadingCommandPunctuation(foldedText.slice(orderRef.end).trim());
     var editCommand = findDraftEditCommand(rawRest);
     if (!editCommand) {
       return null;
@@ -1025,6 +1029,134 @@
       rawRest: rawRest,
       editCommand: editCommand
     };
+  }
+
+  function parseSpokenOrderReference(text) {
+    var foldedText = stripLeadingCommandPunctuation(foldText(text || ""));
+    var match = /^(?:sua\s+)?(?:order|oder|o do|don hang|don)\s+(?:so\s+)?/u.exec(foldedText);
+    if (!match) {
+      return null;
+    }
+
+    var afterPrefix = stripLeadingCommandPunctuation(foldedText.slice(match[0].length));
+    var latestRef = parseLatestOrderReference(afterPrefix);
+    if (latestRef) {
+      return {
+        latest: true,
+        end: match[0].length + latestRef.end
+      };
+    }
+
+    var spokenNumber = parseSpokenOrderNumber(afterPrefix);
+    if (!spokenNumber) {
+      return null;
+    }
+
+    return {
+      value: spokenNumber.value,
+      end: match[0].length + spokenNumber.end
+    };
+  }
+
+  function parseLatestOrderReference(text) {
+    var foldedText = foldText(text || "");
+    var latestPhrases = ["moi nhat", "gan nhat", "vua gui", "cuoi cung", "cuoi"];
+    for (var i = 0; i < latestPhrases.length; i += 1) {
+      var phrase = latestPhrases[i];
+      var regex = new RegExp("^" + escapeRegex(phrase).replace(/\s+/g, "\\s+") + "(?=$|[^\\p{L}\\p{N}])", "u");
+      var match = regex.exec(foldedText);
+      if (match) {
+        return { end: match[0].length };
+      }
+    }
+    return null;
+  }
+
+  function parseSpokenOrderNumber(text) {
+    var tokens = leadingSpeechTokens(text);
+    var index = 0;
+    while (tokens[index] && spokenNumberTokenValue(tokens[index].value) === 0) {
+      index += 1;
+    }
+
+    if (!tokens[index]) {
+      return null;
+    }
+
+    var first = tokens[index];
+    if (/^\d+$/.test(first.value)) {
+      return {
+        value: parseInt(first.value, 10),
+        end: first.end
+      };
+    }
+
+    var firstValue = spokenNumberTokenValue(first.value);
+    if (firstValue === null) {
+      return null;
+    }
+
+    var second = tokens[index + 1];
+    var third = tokens[index + 2];
+    if (first.value === "muoi") {
+      var afterTen = second ? spokenNumberTokenValue(second.value) : null;
+      if (afterTen !== null && afterTen > 0 && afterTen < 10) {
+        return {
+          value: 10 + afterTen,
+          end: second.end
+        };
+      }
+      return {
+        value: 10,
+        end: first.end
+      };
+    }
+
+    if (second && second.value === "muoi" && firstValue > 0) {
+      var ones = third ? spokenNumberTokenValue(third.value) : null;
+      if (ones !== null && ones > 0 && ones < 10) {
+        return {
+          value: firstValue * 10 + ones,
+          end: third.end
+        };
+      }
+      return {
+        value: firstValue * 10,
+        end: second.end
+      };
+    }
+
+    return {
+      value: firstValue,
+      end: first.end
+    };
+  }
+
+  function leadingSpeechTokens(text) {
+    var tokens = [];
+    var regex = /\S+/gu;
+    var match;
+    while ((match = regex.exec(foldText(text || ""))) !== null) {
+      tokens.push({
+        value: match[0],
+        end: match.index + match[0].length
+      });
+    }
+    return tokens;
+  }
+
+  function spokenNumberTokenValue(token) {
+    var foldedToken = foldText(token || "");
+    if (/^\d+$/.test(foldedToken)) {
+      return parseInt(foldedToken, 10);
+    }
+    if (foldedToken === "khong" || foldedToken === "zero") {
+      return 0;
+    }
+    if (Object.prototype.hasOwnProperty.call(numberWords, foldedToken)) {
+      return numberWords[foldedToken];
+    }
+    return null;
   }
 
   function findOrderBySpokenNumber(value) {
@@ -1040,6 +1172,17 @@
       var match = String(order.id || "").match(/(\d+)$/);
       return match && parseInt(match[1], 10) === orderNumber;
     }) || null;
+  }
+
+  function findLatestOrder() {
+    return (state.orders || []).slice().sort(function (a, b) {
+      var numberA = orderNumber(a);
+      var numberB = orderNumber(b);
+      if (numberA !== numberB) {
+        return numberB - numberA;
+      }
+      return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
+    })[0] || null;
   }
 
   function buildVoiceEditCommand(type, targetText) {
@@ -1194,12 +1337,121 @@
     return true;
   }
 
+  function buildSpeechPreview(committedText, interimText) {
+    var committed = normalizeSpeechChunk(committedText);
+    var interim = collapseAdjacentRepeatedSpeech(interimText);
+    if (!interim) {
+      return committed;
+    }
+
+    var committedFolded = foldText(committed);
+    var interimFolded = foldText(interim);
+    if (!committedFolded || interimFolded.indexOf(committedFolded + " ") === 0 || interimFolded === committedFolded) {
+      return interim;
+    }
+
+    return appendSpeechPart(committed, interim);
+  }
+
+  function appendSpeechPart(baseText, addedText) {
+    var base = normalizeSpeechChunk(baseText);
+    var added = collapseAdjacentRepeatedSpeech(addedText);
+    if (!added) {
+      return base;
+    }
+    if (!base) {
+      return added;
+    }
+
+    var baseWords = speechWords(foldText(base));
+    var addedWords = speechWords(foldText(added));
+    var originalAddedWords = speechWords(added);
+    var overlap = Math.min(baseWords.length, addedWords.length);
+
+    while (overlap > 0) {
+      if (wordsEqual(baseWords.slice(baseWords.length - overlap), addedWords.slice(0, overlap))) {
+        break;
+      }
+      overlap -= 1;
+    }
+
+    var newWords = originalAddedWords.slice(overlap);
+    if (!newWords.length) {
+      return base;
+    }
+
+    return normalizeSpeechChunk(base + " " + newWords.join(" "));
+  }
+
+  function collapseAdjacentRepeatedSpeech(text) {
+    var normalized = normalizeSpeechChunk(text);
+    var originalWords = speechWords(normalized);
+    var foldedWords = speechWords(foldText(normalized));
+    var output = [];
+    var index = 0;
+
+    while (index < originalWords.length) {
+      var repeated = findRepeatedSpeechBlock(foldedWords, index);
+      output = output.concat(originalWords.slice(index, index + repeated.unit));
+      index += repeated.unit * repeated.count;
+    }
+
+    return output.join(" ");
+  }
+
+  function findRepeatedSpeechBlock(words, startIndex) {
+    var remaining = words.length - startIndex;
+    var maxUnit = Math.floor(remaining / 2);
+
+    for (var unit = maxUnit; unit >= 1; unit -= 1) {
+      var count = 1;
+      while (startIndex + unit * (count + 1) <= words.length) {
+        var current = words.slice(startIndex, startIndex + unit);
+        var next = words.slice(startIndex + unit * count, startIndex + unit * (count + 1));
+        if (!wordsEqual(current, next)) {
+          break;
+        }
+        count += 1;
+      }
+
+      if (count > 1 && (unit > 1 || count > 2)) {
+        return { unit: unit, count: count };
+      }
+    }
+
+    return { unit: 1, count: 1 };
+  }
+
+  function wordsEqual(left, right) {
+    if (left.length !== right.length) {
+      return false;
+    }
+    for (var i = 0; i < left.length; i += 1) {
+      if (left[i] !== right[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function speechWords(text) {
+    return normalizeSpeechChunk(text).split(" ").filter(Boolean);
+  }
+
+  function normalizeSpeechChunk(text) {
+    return String(text || "").replace(/\s+/g, " ").trim();
+  }
+
   function handleFinalSpeech(text) {
     if (voiceCommandProcessing) {
       return;
     }
 
-    activeTranscript = (activeTranscript + " " + text).trim();
+    var nextTranscript = appendSpeechPart(activeTranscript, text);
+    if (nextTranscript === normalizeSpeechChunk(activeTranscript)) {
+      return;
+    }
+    activeTranscript = nextTranscript;
 
     if (containsCancelCommand(activeTranscript)) {
       clearDraft();

@@ -785,3 +785,30 @@ Understanding checklist:
 - [x] Solution: the Menu tab now includes editable recognition words for split, send, increase, decrease, remove, add, and replace commands.
 - [x] Edge case: edit commands only activate when they start the phrase and the following words match a menu item, reducing conflict with normal order words like `thêm đá`.
 - [x] Impact: after the initial phone check, staff can correct and submit the order by voice.
+
+## Stage 26: Duplicate Speech Guard
+
+Fixed repeated transcript text when Chrome emits the same speech segment multiple times.
+
+Understanding checklist:
+
+- [x] Problem: Web Speech can resend old final/interim transcript chunks, so appending every chunk directly can repeat the whole spoken phrase several times.
+- [x] Solution: the mic layer now collapses adjacent repeated speech blocks before parsing.
+- [x] Solution: final transcript is appended by overlap, so if the browser sends `sữa nhỏ` then later sends `sữa nhỏ trà lài`, only `trà lài` is added.
+- [x] Solution: interim preview detects when the browser already returned the committed words and avoids prefixing them again.
+- [x] Edge case: repeated exact phrases like `sữa nhỏ sữa nhỏ sữa nhỏ` collapse to one phrase, while normal different items can still be added.
+- [x] Impact: order parsing receives cleaner text, so draft items should not multiply just because the mic repeated the transcript.
+
+## Stage 27: Sent Order Voice Edit Recognition
+
+Made voice editing for already-sent kitchen orders match real phone speech better.
+
+Understanding checklist:
+
+- [x] Problem: staff might say `order 1`, but phone speech recognition can return `order một`, `oder một`, or `ô đờ một`.
+- [x] Problem: the old sent-order command matcher only accepted numeric digits, so many valid spoken commands never reached the order edit logic.
+- [x] Solution: sent-order voice commands now accept spoken order numbers such as `một`, `hai`, `mười hai`, and `hai mươi ba`.
+- [x] Solution: the matcher accepts natural variants like `order`, `oder`, `ô đờ`, `đơn`, `đơn số`, and `đơn hàng`.
+- [x] Solution: staff can say `order mới nhất ...` or `order vừa gửi ...` to edit the newest sent order without remembering the exact number.
+- [x] Edge case: if saving the edited order fails, the mic reports the failure and keeps listening instead of getting stuck.
+- [x] Impact: commands like `order một đổi cafe đen thành cafe sữa` should update the kitchen order directly.
