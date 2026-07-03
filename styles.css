@@ -470,17 +470,23 @@ input:focus {
 
 .draft-list,
 .menu-list,
-.kitchen-board {
+.kitchen-board,
+.voice-command-list {
   display: grid;
   gap: 10px;
 }
 
 .draft-item,
 .menu-item,
-.order-card {
+.order-card,
+.voice-command-item {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+.voice-command-item {
+  padding: 12px;
 }
 
 .draft-item {

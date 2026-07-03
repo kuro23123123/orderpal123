@@ -78,6 +78,16 @@ const menuSizeOptions = {
   m_tra_oolong_cold_brew_mo_dao: ["L"]
 };
 
+const defaultVoiceCommands = {
+  split: ["xong"],
+  send: ["gửi bếp", "gui bep", "gửi", "gui", "ok", "okay", "ô kê", "o ke"],
+  increase: ["tăng số", "tang so", "tăng", "tang", "cộng", "cong"],
+  decrease: ["giảm số", "giam so", "giảm", "giam", "bớt", "bot", "trừ", "tru"],
+  remove: ["xóa món", "xoa mon", "xoá món", "xóa", "xoa", "xoá", "bỏ", "bo"],
+  add: ["thêm món", "them mon", "thêm", "them"],
+  replace: ["đổi", "doi", "đổi món", "doi mon", "thay", "thay món", "thay mon"]
+};
+
 const defaultData = {
   sequence: 0,
   menu: applyMenuPrices([
@@ -114,6 +124,7 @@ const defaultData = {
     { id: "m_tra_sen_cold_brew_tao", name: "Trà Sen Cold Brew Vị Táo", aliases: ["tra sen cold brew vi tao", "trà sen cold brew táo"], active: true },
     { id: "m_tra_oolong_cold_brew_mo_dao", name: "Trà Oolong Cold Brew Vị Mơ Đào", aliases: ["tra oolong cold brew vi mo dao", "oolong cold brew mơ đào"], active: true }
   ]),
+  voiceCommands: defaultVoiceCommands,
   orders: []
 };
 
@@ -175,6 +186,7 @@ async function handleApi(request, response, requestUrl) {
       sendJson(response, 200, {
         mode: "local-server",
         menu: data.menu,
+        voiceCommands: data.voiceCommands,
         orders: data.orders
       });
       return;
@@ -338,6 +350,14 @@ async function handleApi(request, response, requestUrl) {
       return;
     }
 
+    if (method === "PATCH" && pathname === "/api/voice-commands") {
+      const body = await readJsonBody(request);
+      data.voiceCommands = normalizeVoiceCommands(body.voiceCommands || body);
+      writeData(data);
+      sendJson(response, 200, { voiceCommands: data.voiceCommands });
+      return;
+    }
+
     sendJson(response, 404, { error: "Not found." });
   } catch (error) {
     sendJson(response, 500, { error: error.message || "Server error." });
@@ -355,6 +375,7 @@ function readData() {
     return {
       sequence: Number(data.sequence) || 0,
       menu: applyMenuPrices(Array.isArray(data.menu) ? data.menu : clone(defaultData.menu)),
+      voiceCommands: normalizeVoiceCommands(data.voiceCommands),
       orders: Array.isArray(data.orders) ? data.orders : []
     };
   } catch (error) {
@@ -445,7 +466,7 @@ function normalizeOrderItems(menu, items) {
 
 function normalizeAliasList(values) {
   const seen = new Set();
-  return values
+  return (values || [])
     .map(cleanText)
     .filter((alias) => {
       const key = normalizeText(alias);
@@ -455,6 +476,21 @@ function normalizeAliasList(values) {
       seen.add(key);
       return true;
     });
+}
+
+function normalizeVoiceCommands(commands) {
+  const normalized = clone(defaultVoiceCommands);
+  Object.keys(commands || {}).forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(defaultVoiceCommands, key)) {
+      return;
+    }
+    const values = Array.isArray(commands[key]) ? commands[key] : String(commands[key] || "").split(/,|\n/);
+    const aliases = normalizeAliasList(values);
+    if (aliases.length) {
+      normalized[key] = aliases;
+    }
+  });
+  return normalized;
 }
 
 function normalizeText(value) {

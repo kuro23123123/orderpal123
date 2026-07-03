@@ -5,7 +5,8 @@
     menu: "voiceKitchen.menu.v1",
     orders: "voiceKitchen.orders.v1",
     sequence: "voiceKitchen.sequence.v1",
-    deviceName: "voiceKitchen.deviceName.v1"
+    deviceName: "voiceKitchen.deviceName.v1",
+    voiceCommands: "voiceKitchen.voiceCommands.v1"
   };
 
   var PRIMARY_WAKE_PHRASE = "ghi món";
@@ -16,6 +17,26 @@
   var activeTranscript = "";
   var voiceAutoFinishTimer = null;
   var lastVoiceParseText = "";
+  var voiceCommandProcessing = false;
+  var defaultVoiceCommands = {
+    split: ["xong"],
+    send: ["gửi bếp", "gui bep", "gửi", "gui", "ok", "okay", "ô kê", "o ke"],
+    increase: ["tăng số", "tang so", "tăng", "tang", "cộng", "cong"],
+    decrease: ["giảm số", "giam so", "giảm", "giam", "bớt", "bot", "trừ", "tru"],
+    remove: ["xóa món", "xoa mon", "xoá món", "xóa", "xoa", "xoá", "bỏ", "bo"],
+    add: ["thêm món", "them mon", "thêm", "them"],
+    replace: ["đổi", "doi", "đổi món", "doi mon", "thay", "thay món", "thay mon"]
+  };
+  var voiceCommandGroups = [
+    { type: "split", label: "Tách món", hint: "Ví dụ: xong" },
+    { type: "send", label: "Gửi bếp", hint: "Ví dụ: gửi, ok" },
+    { type: "increase", label: "Tăng số món", hint: "Ví dụ: tăng, cộng" },
+    { type: "decrease", label: "Giảm số món", hint: "Ví dụ: giảm, bớt" },
+    { type: "remove", label: "Xóa món", hint: "Ví dụ: xóa, bỏ" },
+    { type: "add", label: "Thêm món", hint: "Ví dụ: thêm món, thêm" },
+    { type: "replace", label: "Đổi món", hint: "Ví dụ: đổi, thay" }
+  ];
+  var draftEditCommandTypes = ["increase", "decrease", "remove", "add", "replace"];
 
   var MENU_PRICES = {
     m_phin_den_da: { S: 16, M: 20 },
@@ -201,6 +222,7 @@
 
   var state = {
     menu: upgradeMenu(loadJson(STORAGE_KEYS.menu, defaultMenu)),
+    voiceCommands: upgradeVoiceCommands(loadJson(STORAGE_KEYS.voiceCommands, defaultVoiceCommands)),
     orders: loadJson(STORAGE_KEYS.orders, []),
     draft: [],
     editingOrderId: null,
@@ -253,6 +275,8 @@
     els.menuName = document.getElementById("menu-name");
     els.menuAliases = document.getElementById("menu-aliases");
     els.menuList = document.getElementById("menu-list");
+    els.voiceCommandList = document.getElementById("voice-command-list");
+    els.saveVoiceCommands = document.getElementById("save-voice-commands");
     els.revenueDate = document.getElementById("revenue-date");
     els.revenueTotal = document.getElementById("revenue-total");
     els.revenueOrders = document.getElementById("revenue-orders");
@@ -290,6 +314,7 @@
       event.preventDefault();
       addMenuItem();
     });
+    els.saveVoiceCommands.addEventListener("click", saveVoiceCommandAliases);
 
     window.addEventListener("storage", function (event) {
       if (event.key === STORAGE_KEYS.orders) {
@@ -304,6 +329,12 @@
         }
         renderRevenue();
       }
+      if (event.key === STORAGE_KEYS.voiceCommands) {
+        state.voiceCommands = upgradeVoiceCommands(loadJson(STORAGE_KEYS.voiceCommands, defaultVoiceCommands));
+        if (!isEditingVoiceCommands()) {
+          renderVoiceCommandEditor();
+        }
+      }
     });
   }
 
@@ -312,13 +343,18 @@
       .then(function (data) {
         state.serverMode = true;
         state.menu = data.menu || state.menu;
+        state.voiceCommands = upgradeVoiceCommands(data.voiceCommands || state.voiceCommands);
         state.orders = data.orders || [];
         saveJson(STORAGE_KEYS.menu, state.menu);
+        saveJson(STORAGE_KEYS.voiceCommands, state.voiceCommands);
         saveJson(STORAGE_KEYS.orders, state.orders);
         setSyncStatus("Đã đồng bộ với máy chủ local của quán.", "online");
         renderKitchen();
         if (!isEditingMenuAliases()) {
           renderMenu();
+        }
+        if (!isEditingVoiceCommands()) {
+          renderVoiceCommandEditor();
         }
         renderRevenue();
       })
@@ -366,7 +402,7 @@
 
     recognition = new SpeechRecognition();
     recognition.lang = "vi-VN";
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
@@ -383,12 +419,13 @@
         }
       }
 
-      if (interimText.trim()) {
-        els.transcript.value = (activeTranscript + " " + interimText.trim()).trim();
-        scheduleVoiceAutoFinish(1000);
+      if (interimText.trim() && !voiceCommandProcessing) {
+        var previewText = (activeTranscript + " " + interimText.trim()).trim();
+        els.transcript.value = previewText;
+        handleVoiceCommandIfPresent(previewText);
       }
 
-      if (finalText.trim()) {
+      if (finalText.trim() && !voiceCommandProcessing) {
         handleFinalSpeech(finalText.trim());
       }
     };
@@ -412,16 +449,20 @@
       }
 
       if (listeningMode === "order") {
-        if (!finishOrderSpeech(activeTranscript || els.transcript.value, false)) {
-          listeningMode = "idle";
-          setVoiceButtons(false);
-          setVoiceState("Không nghe rõ", "idle");
-          els.speechSupport.textContent = "Không nghe rõ. Bấm Nói món và nói lại.";
+        if (recognition && listeningMode === "order") {
+          try {
+            recognition.start();
+            setVoiceState("Đang nghe", "listening");
+            setVoiceButtons(true);
+          } catch (error) {
+            setVoiceState("Không nghe rõ", "idle");
+            els.speechSupport.textContent = "Micro đã dừng. Bấm Nói món để nghe tiếp.";
+          }
         }
       }
     };
 
-    els.speechSupport.textContent = window.isSecureContext ? "Bấm Nói món rồi nói tên món." : "Bấm Nói món. Nếu trình duyệt chặn mic trên HTTP, cần chạy bản HTTPS local.";
+    els.speechSupport.textContent = window.isSecureContext ? "Bấm Nói món, nói order. Nói 'xong' để tách, nói 'tăng/giảm/xóa/thêm/đổi' để sửa, nói 'gửi' hoặc 'ok' để gửi bếp." : "Bấm Nói món. Nếu trình duyệt chặn mic trên HTTP, cần chạy bản HTTPS local.";
     setVoiceState("Chờ", "idle");
     setVoiceButtons(false);
   }
@@ -446,11 +487,12 @@
       return;
     }
     activeTranscript = "";
+    voiceCommandProcessing = false;
     els.transcript.value = "";
     listeningMode = "order";
     setVoiceState("Đang nghe", "listening");
     setVoiceButtons(true);
-    els.speechSupport.textContent = "Đang nghe. Nói ngắn gọn: sữa nhỏ ngọt ít đá, hoặc 1 sữa nhỏ 1 trà lài.";
+    els.speechSupport.textContent = "Đang nghe. Nói order, nói 'xong' để tách, 'tăng/giảm/xóa/thêm/đổi' để sửa, 'gửi' để gửi bếp.";
     startRecognition();
   }
 
@@ -475,6 +517,7 @@
     if (resetMode !== false) {
       listeningMode = "idle";
     }
+    voiceCommandProcessing = false;
     clearVoiceAutoFinishTimer();
     if (recognition) {
       try {
@@ -485,7 +528,7 @@
     }
     if (listeningMode === "idle") {
       setVoiceState("Chờ", "idle");
-      els.speechSupport.textContent = SpeechRecognition ? "Bấm Nói món rồi nói tên món." : els.speechSupport.textContent;
+      els.speechSupport.textContent = SpeechRecognition ? "Bấm Nói món, nói order. Nói 'xong' để tách, nói 'tăng/giảm/xóa/thêm/đổi' để sửa, nói 'gửi' hoặc 'ok' để gửi bếp." : els.speechSupport.textContent;
     }
     setVoiceButtons(false);
   }
@@ -500,13 +543,13 @@
   }
 
   function scheduleVoiceAutoFinish(delayMs) {
-    if (listeningMode !== "order") {
+    if (listeningMode !== "order" || voiceCommandProcessing) {
       return;
     }
 
     clearVoiceAutoFinishTimer();
     voiceAutoFinishTimer = window.setTimeout(function () {
-      finishOrderSpeech(els.transcript.value || activeTranscript, true);
+      parseActiveVoiceSegment("Tự tách sau khi ngừng nói.");
     }, delayMs || 1000);
   }
 
@@ -517,6 +560,598 @@
 
     window.clearTimeout(voiceAutoFinishTimer);
     voiceAutoFinishTimer = null;
+  }
+
+  function parseActiveVoiceSegment(statusText) {
+    clearVoiceAutoFinishTimer();
+    var text = stripWakePhrase(activeTranscript || els.transcript.value || "").trim();
+    if (!text || containsOnlyVoiceCommand(text)) {
+      activeTranscript = "";
+      els.transcript.value = "";
+      return Promise.resolve(false);
+    }
+
+    activeTranscript = "";
+    els.transcript.value = "";
+    lastVoiceParseText = text;
+    return parseAndSetDraft(text, {
+      append: true,
+      keepListening: listeningMode === "order",
+      statusText: statusText || "Đã tách đoạn vừa nghe. Mic vẫn đang nghe."
+    }).then(function (result) {
+      if (listeningMode === "order") {
+        setVoiceState("Đang nghe", "listening");
+        setVoiceButtons(true);
+      }
+      return result;
+    });
+  }
+
+  function handleVoiceCommandIfPresent(rawText) {
+    if (listeningMode !== "order" || voiceCommandProcessing) {
+      return false;
+    }
+
+    var sentOrderCommand = findSentOrderEditCommand(rawText);
+    if (sentOrderCommand) {
+      voiceCommandProcessing = true;
+      clearVoiceAutoFinishTimer();
+      activeTranscript = "";
+      els.transcript.value = sentOrderCommand.rawRest;
+      applySentOrderEditCommand(sentOrderCommand.order, sentOrderCommand.editCommand).then(function (message) {
+        restartOrderListeningAfterCommand(message);
+      });
+      return true;
+    }
+
+    var editCommand = findDraftEditCommand(rawText);
+    if (editCommand) {
+      voiceCommandProcessing = true;
+      clearVoiceAutoFinishTimer();
+      activeTranscript = "";
+      els.transcript.value = editCommand.targetText;
+      applyDraftEditCommand(editCommand).then(function (message) {
+        restartOrderListeningAfterCommand(message);
+      });
+      return true;
+    }
+
+    var command = findFirstVoiceCommand(rawText);
+    if (!command) {
+      return false;
+    }
+
+    voiceCommandProcessing = true;
+    clearVoiceAutoFinishTimer();
+    var beforeCommand = rawText.slice(0, command.position).trim();
+    activeTranscript = beforeCommand;
+    els.transcript.value = beforeCommand;
+
+    if (command.type === "split") {
+      parseActiveVoiceSegment("Đã nghe lệnh tách và tách đoạn vừa nói. Mic vẫn đang nghe.").then(function () {
+        restartOrderListeningAfterCommand("Đã tách món. Nói món tiếp hoặc nói 'gửi'.");
+      });
+      return true;
+    }
+
+    parseActiveVoiceSegment("Đã nghe lệnh gửi. Đang gửi order lên bếp.").then(function () {
+      sendDraftByVoice();
+    });
+    return true;
+  }
+
+  function sendDraftByVoice() {
+    if (!state.draft.length) {
+      els.postFeedback.textContent = "Chưa có món để gửi.";
+      restartOrderListeningAfterCommand("Chưa có món để gửi. Mic vẫn đang nghe.");
+      return;
+    }
+
+    Promise.resolve(postDraftOrder({ keepWaiter: true, voiceCommand: true }))
+      .then(function () {
+        if (listeningMode === "order") {
+          restartOrderListeningAfterCommand("Đã gửi bếp. Mic vẫn đang nghe order tiếp theo.");
+        }
+      })
+      .catch(function () {
+        if (listeningMode === "order") {
+          restartOrderListeningAfterCommand("Chưa gửi được bếp. Kiểm tra kết nối rồi nói 'gửi' lại.");
+        }
+      });
+  }
+
+  function applyDraftEditCommand(command) {
+    if (command.type === "replace") {
+      return applyDraftReplaceCommand(command);
+    }
+
+    var parsedItems = command.parseResult.items || [];
+    if (!parsedItems.length) {
+      return Promise.resolve("Không nghe rõ món cần sửa. Hãy nói lại.");
+    }
+
+    if (command.type === "add") {
+      addParsedItemsToDraft(parsedItems, true);
+      renderDraft({ raw: command.targetText, needsReview: command.parseResult.needsReview });
+      scrollDraftIntoView();
+      return Promise.resolve("Đã thêm món. Mic vẫn đang nghe.");
+    }
+
+    var target = parsedItems[0];
+    var quantity = Math.max(1, target.quantity || 1);
+    var targetKey = draftItemDuplicateKey(target);
+    var matched = false;
+
+    state.draft = state.draft.reduce(function (items, item) {
+      if (draftItemDuplicateKey(item) !== targetKey) {
+        items.push(item);
+        return items;
+      }
+
+      matched = true;
+      if (command.type === "remove") {
+        return items;
+      }
+
+      var next = Object.assign({}, item);
+      if (command.type === "increase") {
+        next.quantity += quantity;
+      }
+      if (command.type === "decrease") {
+        next.quantity -= quantity;
+      }
+      if (next.quantity > 0) {
+        items.push(next);
+      }
+      return items;
+    }, []);
+
+    if (!matched) {
+      els.postFeedback.textContent = "Không thấy " + target.name + " trong order nháp.";
+      return Promise.resolve("Không thấy món cần sửa trong order nháp. Mic vẫn đang nghe.");
+    }
+
+    renderDraft({ raw: command.targetText, needsReview: false });
+    scrollDraftIntoView();
+
+    if (command.type === "increase") {
+      return Promise.resolve("Đã tăng " + target.name + ". Mic vẫn đang nghe.");
+    }
+    if (command.type === "decrease") {
+      return Promise.resolve("Đã giảm " + target.name + ". Mic vẫn đang nghe.");
+    }
+    return Promise.resolve("Đã xóa " + target.name + ". Mic vẫn đang nghe.");
+  }
+
+  function applyDraftReplaceCommand(command) {
+    var source = command.sourceItem;
+    var replacement = command.replacementItem;
+    var sourceKey = draftItemDuplicateKey(source);
+    var removedQuantity = 0;
+    var removedName = source.name;
+
+    state.draft = state.draft.reduce(function (items, item) {
+      if (draftItemDuplicateKey(item) !== sourceKey) {
+        items.push(item);
+        return items;
+      }
+      removedQuantity += Math.max(1, item.quantity || 1);
+      removedName = item.name;
+      return items;
+    }, []);
+
+    if (!removedQuantity) {
+      els.postFeedback.textContent = "Không thấy " + source.name + " trong order nháp.";
+      return Promise.resolve("Không thấy món cần đổi trong order nháp. Mic vẫn đang nghe.");
+    }
+
+    addParsedItemsToDraft([Object.assign({}, replacement, { quantity: removedQuantity })], true);
+    renderDraft({ raw: command.targetText, needsReview: command.replacementResult.needsReview });
+    scrollDraftIntoView();
+    return Promise.resolve("Đã đổi " + removedName + " thành " + replacement.name + ". Mic vẫn đang nghe.");
+  }
+
+  function applySentOrderEditCommand(order, command) {
+    var items = (order.items || []).map(function (item) {
+      return Object.assign({}, item);
+    });
+
+    if (command.type === "replace") {
+      return applySentOrderReplaceCommand(order, command, items);
+    }
+
+    var parsedItems = command.parseResult.items || [];
+    if (!parsedItems.length) {
+      return Promise.resolve("Không nghe rõ món cần sửa trong " + order.id + ".");
+    }
+
+    var target = parsedItems[0];
+    var quantity = Math.max(1, target.quantity || 1);
+    var targetKey = draftItemDuplicateKey(target);
+    var matched = false;
+
+    items = items.reduce(function (nextItems, item) {
+      if (draftItemDuplicateKey(item) !== targetKey) {
+        nextItems.push(item);
+        return nextItems;
+      }
+
+      matched = true;
+      if (command.type === "remove") {
+        return nextItems;
+      }
+
+      var next = Object.assign({}, item);
+      if (command.type === "increase" || command.type === "add") {
+        next.quantity += quantity;
+      }
+      if (command.type === "decrease") {
+        next.quantity -= quantity;
+      }
+      if (next.quantity > 0) {
+        nextItems.push(next);
+      }
+      return nextItems;
+    }, []);
+
+    if (!matched && command.type === "add") {
+      items = items.concat(parsedItems.map(function (item) {
+        return Object.assign({}, item);
+      }));
+      matched = true;
+    }
+
+    if (!matched) {
+      return Promise.resolve("Không thấy " + target.name + " trong " + order.id + ".");
+    }
+
+    return saveVoiceEditedOrder(order, items).then(function () {
+      if (command.type === "increase") {
+        return "Đã tăng " + target.name + " trong " + order.id + ".";
+      }
+      if (command.type === "decrease") {
+        return "Đã giảm " + target.name + " trong " + order.id + ".";
+      }
+      if (command.type === "add") {
+        return "Đã thêm " + target.name + " vào " + order.id + ".";
+      }
+      return "Đã xóa " + target.name + " khỏi " + order.id + ".";
+    });
+  }
+
+  function applySentOrderReplaceCommand(order, command, items) {
+    var source = command.sourceItem;
+    var replacement = command.replacementItem;
+    var sourceKey = draftItemDuplicateKey(source);
+    var removedQuantity = 0;
+    var removedName = source.name;
+
+    items = items.reduce(function (nextItems, item) {
+      if (draftItemDuplicateKey(item) !== sourceKey) {
+        nextItems.push(item);
+        return nextItems;
+      }
+      removedQuantity += Math.max(1, item.quantity || 1);
+      removedName = item.name;
+      return nextItems;
+    }, []);
+
+    if (!removedQuantity) {
+      return Promise.resolve("Không thấy " + source.name + " trong " + order.id + ".");
+    }
+
+    items.push(Object.assign({}, replacement, { quantity: removedQuantity }));
+    return saveVoiceEditedOrder(order, items).then(function () {
+      return "Đã đổi " + removedName + " thành " + replacement.name + " trong " + order.id + ".";
+    });
+  }
+
+  function saveVoiceEditedOrder(order, items) {
+    var payload = {
+      createdBy: els.deviceName.value.trim() || "Máy nhân viên",
+      label: order.label || "",
+      businessDate: orderBusinessDate(order) || todayDateKey(),
+      note: order.note || "",
+      items: items.map(function (item) {
+        return {
+          id: item.id,
+          name: item.name,
+          quantity: Math.max(1, Number(item.quantity) || 1),
+          size: normalizeSizeForMenuItem(item, item.size || DEFAULT_SIZE_NOTE),
+          taste: item.taste || item.note || DEFAULT_TASTE_NOTE,
+          ice: item.ice || DEFAULT_ICE_NOTE,
+          prep: item.prep || "",
+          ownBottle: isOwnBottleItem(item),
+          container: isOwnBottleItem(item) ? "bình riêng" : "",
+          unitPrice: getItemUnitPrice(item),
+          note: item.taste || item.note || DEFAULT_TASTE_NOTE
+        };
+      })
+    };
+
+    if (state.serverMode) {
+      return apiRequest("/api/orders/" + encodeURIComponent(order.id), {
+        method: "PATCH",
+        body: JSON.stringify(payload)
+      }).then(function (updatedOrder) {
+        state.orders = state.orders.map(function (existing) {
+          return existing.id === updatedOrder.id ? updatedOrder : existing;
+        });
+        saveJson(STORAGE_KEYS.orders, state.orders);
+        renderKitchen();
+        renderRevenue();
+        els.postFeedback.textContent = "Đã sửa " + updatedOrder.id + ".";
+        return updatedOrder;
+      });
+    }
+
+    state.orders = state.orders.map(function (existing) {
+      if (existing.id !== order.id) {
+        return existing;
+      }
+      return Object.assign({}, existing, {
+        items: payload.items,
+        label: payload.label,
+        businessDate: payload.businessDate,
+        note: payload.note,
+        status: "new",
+        hiddenFromKitchen: false,
+        updatedAt: new Date().toISOString(),
+        editedBy: payload.createdBy
+      });
+    });
+    saveJson(STORAGE_KEYS.orders, state.orders);
+    renderKitchen();
+    renderRevenue();
+    els.postFeedback.textContent = "Đã sửa " + order.id + ".";
+    return Promise.resolve(order);
+  }
+
+  function addParsedItemsToDraft(parsedItems, incrementExisting) {
+    (parsedItems || []).forEach(function (item) {
+      var duplicateKey = draftItemDuplicateKey(item);
+      var existing = state.draft.find(function (draftItem) {
+        return draftItemDuplicateKey(draftItem) === duplicateKey;
+      });
+
+      if (existing) {
+        if (incrementExisting) {
+          existing.quantity += Math.max(1, item.quantity || 1);
+        }
+        return;
+      }
+
+      var signature = draftItemSignature(item);
+      state.draft.push(Object.assign({}, item, {
+        draftKey: (state.editingOrderId || "draft") + "::voice-added::" + Date.now().toString(36) + "::" + state.draft.length + "::" + signature,
+        source: "món thêm"
+      }));
+    });
+  }
+
+  function restartOrderListeningAfterCommand(message) {
+    activeTranscript = "";
+    lastVoiceParseText = "";
+    els.transcript.value = "";
+    if (listeningMode !== "order") {
+      voiceCommandProcessing = false;
+      return;
+    }
+
+    setVoiceState("Đang nghe", "listening");
+    setVoiceButtons(true);
+    els.speechSupport.textContent = message || "Mic vẫn đang nghe. Nói món tiếp hoặc nói 'gửi'.";
+    window.setTimeout(function () {
+      voiceCommandProcessing = false;
+    }, 260);
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch (error) {
+        try {
+          recognition.start();
+        } catch (innerError) {
+          // The onend handler usually restarts recognition after stop().
+        }
+      }
+    }
+  }
+
+  function findDraftEditCommand(rawText) {
+    var foldedText = stripLeadingCommandPunctuation(stripDraftEditIntro(foldText(rawText || "")));
+    var commands = [];
+
+    draftEditCommandTypes.forEach(function (type) {
+      voiceCommandPhrases(type).forEach(function (phrase) {
+        commands.push({
+          type: type,
+          phrase: phrase
+        });
+      });
+    });
+
+    commands.sort(function (a, b) {
+      return b.phrase.length - a.phrase.length;
+    });
+
+    for (var i = 0; i < commands.length; i += 1) {
+      var foldedPhrase = foldText(commands[i].phrase);
+      var regex = new RegExp("^" + escapeRegex(foldedPhrase).replace(/\s+/g, "\\s+") + "(?=$|[^\\p{L}\\p{N}])", "u");
+      var match = regex.exec(foldedText);
+      if (!match) {
+        continue;
+      }
+
+      var targetText = cleanDraftEditTargetText(foldedText.slice(match[0].length).trim());
+      if (!targetText) {
+        continue;
+      }
+
+      var editCommand = buildVoiceEditCommand(commands[i].type, targetText);
+      if (!editCommand) {
+        continue;
+      }
+
+      return Object.assign({
+        type: commands[i].type,
+        phrase: commands[i].phrase,
+        targetText: targetText
+      }, editCommand);
+    }
+
+    return null;
+  }
+
+  function findSentOrderEditCommand(rawText) {
+    var foldedText = foldText(rawText || "").replace(/^sua\s+/u, "").trim();
+    var match = /^(order|don|đơn)\s+(\d+)\s*/u.exec(foldedText);
+    if (!match) {
+      return null;
+    }
+
+    var order = findOrderBySpokenNumber(match[2]);
+    if (!order) {
+      return null;
+    }
+
+    var rawRest = stripLeadingCommandPunctuation(foldedText.slice(match[0].length).trim());
+    var editCommand = findDraftEditCommand(rawRest);
+    if (!editCommand) {
+      return null;
+    }
+
+    return {
+      order: order,
+      rawRest: rawRest,
+      editCommand: editCommand
+    };
+  }
+
+  function findOrderBySpokenNumber(value) {
+    var orderNumber = parseInt(value, 10);
+    if (!Number.isFinite(orderNumber)) {
+      return null;
+    }
+
+    var paddedId = "ORD-" + String(orderNumber).padStart(4, "0");
+    return state.orders.find(function (order) {
+      return order.id === paddedId;
+    }) || state.orders.find(function (order) {
+      var match = String(order.id || "").match(/(\d+)$/);
+      return match && parseInt(match[1], 10) === orderNumber;
+    }) || null;
+  }
+
+  function buildVoiceEditCommand(type, targetText) {
+    if (type === "replace") {
+      var parts = splitReplaceTargetText(targetText);
+      if (!parts) {
+        return null;
+      }
+      var sourceResult = parseOrder(parts.source);
+      var replacementResult = parseOrder(parts.replacement);
+      if (sourceResult.tooUnclear || replacementResult.tooUnclear || !sourceResult.items.length || !replacementResult.items.length) {
+        return null;
+      }
+      return {
+        sourceText: parts.source,
+        replacementText: parts.replacement,
+        sourceResult: sourceResult,
+        replacementResult: replacementResult,
+        sourceItem: sourceResult.items[0],
+        replacementItem: replacementResult.items[0]
+      };
+    }
+
+    var parseResult = parseOrder(targetText);
+    if (parseResult.tooUnclear || !parseResult.items.length) {
+      return null;
+    }
+    return {
+      parseResult: parseResult
+    };
+  }
+
+  function splitReplaceTargetText(text) {
+    var foldedText = foldText(text || "");
+    var separators = [" thanh ", " thành ", " sang ", " qua "];
+    for (var i = 0; i < separators.length; i += 1) {
+      var index = foldedText.indexOf(separators[i]);
+      if (index === -1) {
+        continue;
+      }
+      var source = foldedText.slice(0, index).trim();
+      var replacement = foldedText.slice(index + separators[i].length).trim();
+      if (source && replacement) {
+        return {
+          source: cleanDraftEditTargetText(source),
+          replacement: cleanDraftEditTargetText(replacement)
+        };
+      }
+    }
+    return null;
+  }
+
+  function stripDraftEditIntro(text) {
+    return String(text || "")
+      .replace(/^(sua|sửa)\s+(order|don|đơn)?\s*\d*\s*/u, "")
+      .replace(/^(sua|sửa)\s*/u, "")
+      .trim();
+  }
+
+  function cleanDraftEditTargetText(text) {
+    var tokens = stripLeadingCommandPunctuation(text).split(" ").filter(Boolean);
+    while (tokens.length && ["mon", "món", "ly", "coc", "cốc", "so", "số"].indexOf(tokens[0]) !== -1) {
+      tokens.shift();
+    }
+    return tokens.join(" ").trim();
+  }
+
+  function stripLeadingCommandPunctuation(text) {
+    return String(text || "").replace(/^[\s,.;:!?-]+/u, "").trim();
+  }
+
+  function findFirstVoiceCommand(rawText) {
+    var foldedText = foldText(rawText || "");
+    var commands = [];
+
+    voiceCommandPhrases("split").forEach(function (phrase) {
+      commands.push({ type: "split", phrase: phrase });
+    });
+    voiceCommandPhrases("send").forEach(function (phrase) {
+      commands.push({ type: "send", phrase: phrase });
+    });
+
+    return commands.reduce(function (best, command) {
+      var foldedPhrase = foldText(command.phrase);
+      var regex = new RegExp("(^|[^\\p{L}\\p{N}])(" + escapeRegex(foldedPhrase).replace(/\s+/g, "\\s+") + ")(?=$|[^\\p{L}\\p{N}])", "gu");
+      var match = regex.exec(foldedText);
+      if (!match) {
+        return best;
+      }
+
+      var position = match.index + match[1].length;
+      if (!best || position < best.position) {
+        return {
+          type: command.type,
+          phrase: command.phrase,
+          position: position,
+          end: position + match[2].length
+        };
+      }
+      return best;
+    }, null);
+  }
+
+  function containsOnlyVoiceCommand(text) {
+    var foldedText = foldText(text || "");
+    var commandPhrases = [];
+    voiceCommandGroups.forEach(function (group) {
+      commandPhrases = commandPhrases.concat(voiceCommandPhrases(group.type));
+    });
+    return commandPhrases.some(function (phrase) {
+      return foldedText === foldText(phrase);
+    });
   }
 
   function finishOrderSpeech(rawText, stopMic) {
@@ -560,6 +1195,10 @@
   }
 
   function handleFinalSpeech(text) {
+    if (voiceCommandProcessing) {
+      return;
+    }
+
     activeTranscript = (activeTranscript + " " + text).trim();
 
     if (containsCancelCommand(activeTranscript)) {
@@ -590,29 +1229,39 @@
     }
 
     if (listeningMode === "order") {
-      finishOrderSpeech(activeTranscript, true);
+      if (!handleVoiceCommandIfPresent(activeTranscript)) {
+        els.transcript.value = activeTranscript;
+      }
     }
   }
 
-  function parseAndSetDraft(rawText) {
+  function parseAndSetDraft(rawText, options) {
+    options = options || {};
     var text = stripWakePhrase(rawText || "");
     els.transcript.value = text;
     setVoiceState("Đang tách", "processing");
 
-    window.setTimeout(function () {
+    return new Promise(function (resolve) {
+      window.setTimeout(function () {
       var result = parseOrder(text);
       if (result.tooUnclear) {
-        if (!state.editingOrderId) {
+        if (!state.editingOrderId && !options.append) {
           state.draft = [];
         }
         renderDraft(result);
         scrollDraftIntoView();
-        setVoiceState("Không nghe rõ", "idle");
-        els.speechSupport.textContent = "Không nghe rõ. Bấm Nói món và nói lại ngắn hơn.";
+        if (options.keepListening) {
+          setVoiceState("Đang nghe", "listening");
+          els.speechSupport.textContent = "Không nghe rõ đoạn vừa nói. Mic vẫn đang nghe, hãy nói lại đoạn đó.";
+        } else {
+          setVoiceState("Không nghe rõ", "idle");
+          els.speechSupport.textContent = "Không nghe rõ. Bấm Nói món và nói lại ngắn hơn.";
+        }
+        resolve({ ok: false, result: result });
         return;
       }
 
-      if (state.editingOrderId) {
+      if (state.editingOrderId || options.append) {
         state.draft = mergeDraftItems(state.draft, result.items);
         result = Object.assign({}, result, {
           needsReview: result.needsReview,
@@ -623,9 +1272,16 @@
       }
       renderDraft(result);
       scrollDraftIntoView();
-      setVoiceState("Sẵn sàng", "idle");
-      els.speechSupport.textContent = "Đã tách món. Kiểm tra Order nháp rồi bấm Gửi bếp.";
-    }, 40);
+      if (options.keepListening) {
+        setVoiceState("Đang nghe", "listening");
+        els.speechSupport.textContent = options.statusText || "Đã tách món. Mic vẫn đang nghe.";
+      } else {
+        setVoiceState("Sẵn sàng", "idle");
+        els.speechSupport.textContent = "Đã tách món. Kiểm tra Order nháp rồi bấm Gửi bếp.";
+      }
+      resolve({ ok: true, result: result });
+      }, 40);
+    });
   }
 
   function parseOrder(text) {
@@ -1082,6 +1738,7 @@
     renderDraft();
     renderKitchen();
     renderMenu();
+    renderVoiceCommandEditor();
     renderRevenue();
   }
 
@@ -1209,7 +1866,7 @@
       seen[duplicateKey] = true;
       var signature = draftItemSignature(item);
       merged.push(Object.assign({}, item, {
-        draftKey: state.editingOrderId + "::added::" + Date.now().toString(36) + "::" + merged.length + "::" + signature,
+        draftKey: (state.editingOrderId || "draft") + "::added::" + Date.now().toString(36) + "::" + merged.length + "::" + signature,
         source: "món thêm"
       }));
     });
@@ -1255,21 +1912,23 @@
     renderDraft();
   }
 
-  function postDraftOrder() {
+  function postDraftOrder(options) {
+    options = options && options.keepWaiter !== undefined ? options : {};
+    var keepWaiter = options.keepWaiter === true;
+
     if (!state.draft.length) {
-      return;
+      return Promise.resolve(null);
     }
 
     var payload = buildOrderPayload();
 
     if (state.editingOrderId) {
-      updateExistingOrder(payload);
-      return;
+      return updateExistingOrder(payload, options);
     }
 
     if (state.serverMode) {
       els.postOrder.disabled = true;
-      apiRequest("/api/orders", {
+      return apiRequest("/api/orders", {
         method: "POST",
         body: JSON.stringify(payload)
       }).then(function (order) {
@@ -1278,13 +1937,16 @@
         clearDraft();
         renderKitchen();
         els.postFeedback.textContent = "Đã gửi " + order.id + ".";
-        setActiveView("kitchen");
+        if (!keepWaiter) {
+          setActiveView("kitchen");
+        }
+        return order;
       }).catch(function (error) {
         els.postOrder.disabled = false;
         els.postFeedback.textContent = error.message || "Không gửi được order.";
         setSyncStatus("Không kết nối được server. Order chưa được gửi sang bếp.", "local");
+        throw error;
       });
-      return;
     }
 
     var order = {
@@ -1303,7 +1965,10 @@
     clearDraft();
     renderKitchen();
     els.postFeedback.textContent = "Đã gửi " + order.id + ".";
-    setActiveView("kitchen");
+    if (!keepWaiter) {
+      setActiveView("kitchen");
+    }
+    return Promise.resolve(order);
   }
 
   function buildOrderPayload() {
@@ -1330,11 +1995,13 @@
     };
   }
 
-  function updateExistingOrder(payload) {
+  function updateExistingOrder(payload, options) {
+    options = options || {};
+    var keepWaiter = options.keepWaiter === true;
     var editingOrderId = state.editingOrderId;
     if (state.serverMode) {
       els.postOrder.disabled = true;
-      apiRequest("/api/orders/" + encodeURIComponent(editingOrderId), {
+      return apiRequest("/api/orders/" + encodeURIComponent(editingOrderId), {
         method: "PATCH",
         body: JSON.stringify(payload)
       }).then(function (updatedOrder) {
@@ -1345,13 +2012,16 @@
         clearDraft();
         renderKitchen();
         els.postFeedback.textContent = "Đã cập nhật " + updatedOrder.id + ".";
-        setActiveView("kitchen");
+        if (!keepWaiter) {
+          setActiveView("kitchen");
+        }
+        return updatedOrder;
       }).catch(function (error) {
         els.postOrder.disabled = false;
         els.postFeedback.textContent = error.message || "Không cập nhật được order.";
         setSyncStatus("Không kết nối được server. Order chưa được cập nhật.", "local");
+        throw error;
       });
-      return;
     }
 
     state.orders = state.orders.map(function (order) {
@@ -1373,7 +2043,12 @@
     clearDraft();
     renderKitchen();
     els.postFeedback.textContent = "Đã cập nhật " + editingOrderId + ".";
-    setActiveView("kitchen");
+    if (!keepWaiter) {
+      setActiveView("kitchen");
+    }
+    return Promise.resolve(state.orders.find(function (order) {
+      return order.id === editingOrderId;
+    }));
   }
 
   function deleteEditingOrder() {
@@ -1721,6 +2396,56 @@
     });
   }
 
+  function renderVoiceCommandEditor() {
+    if (!els.voiceCommandList) {
+      return;
+    }
+
+    els.voiceCommandList.innerHTML = "";
+    voiceCommandGroups.forEach(function (group) {
+      var row = document.createElement("article");
+      row.className = "voice-command-item";
+      row.innerHTML =
+        '<label>' +
+          '<span class="field-label">' + escapeHtml(group.label) + '</span>' +
+          '<textarea class="voice-command-aliases" rows="2" spellcheck="false" data-voice-command="' + escapeHtml(group.type) + '">' + escapeHtml(voiceCommandPhrases(group.type).join(", ")) + '</textarea>' +
+          '<div class="alias-help">' + escapeHtml(group.hint) + '</div>' +
+        '</label>';
+      els.voiceCommandList.appendChild(row);
+    });
+  }
+
+  function saveVoiceCommandAliases() {
+    var nextCommands = {};
+    voiceCommandGroups.forEach(function (group) {
+      var editor = document.querySelector('[data-voice-command="' + group.type + '"]');
+      nextCommands[group.type] = normalizeAliasList(editor ? editor.value : "").length
+        ? normalizeAliasList(editor ? editor.value : "")
+        : defaultVoiceCommands[group.type].slice();
+    });
+
+    state.voiceCommands = upgradeVoiceCommands(nextCommands);
+    saveJson(STORAGE_KEYS.voiceCommands, state.voiceCommands);
+
+    if (state.serverMode) {
+      apiRequest("/api/voice-commands", {
+        method: "PATCH",
+        body: JSON.stringify({ voiceCommands: state.voiceCommands })
+      }).then(function (data) {
+        state.voiceCommands = upgradeVoiceCommands(data.voiceCommands || state.voiceCommands);
+        saveJson(STORAGE_KEYS.voiceCommands, state.voiceCommands);
+        renderVoiceCommandEditor();
+        setSyncStatus("Đã lưu từ nhận diện lệnh mic.", "online");
+      }).catch(function () {
+        setSyncStatus("Không kết nối được server. Lệnh mic chỉ lưu trên máy này.", "local");
+      });
+      return;
+    }
+
+    renderVoiceCommandEditor();
+    setSyncStatus("Đã lưu từ nhận diện lệnh mic trên thiết bị này.", "local");
+  }
+
   function renderRevenue() {
     if (!els.revenueBreakdown) {
       return;
@@ -1998,6 +2723,11 @@
     return Boolean(active && active.matches && active.matches("[data-menu-aliases]"));
   }
 
+  function isEditingVoiceCommands() {
+    var active = document.activeElement;
+    return Boolean(active && active.matches && active.matches("[data-voice-command]"));
+  }
+
   function normalizeAliasList(value) {
     var seen = {};
     return String(value || "")
@@ -2143,6 +2873,25 @@
 
     saveJson(STORAGE_KEYS.menu, defaultMenu);
     return clone(defaultMenu);
+  }
+
+  function upgradeVoiceCommands(commands) {
+    var upgraded = clone(defaultVoiceCommands);
+    Object.keys(commands || {}).forEach(function (key) {
+      if (!Object.prototype.hasOwnProperty.call(defaultVoiceCommands, key)) {
+        return;
+      }
+      var aliases = normalizeAliasList(Array.isArray(commands[key]) ? commands[key].join(", ") : commands[key]);
+      if (aliases.length) {
+        upgraded[key] = aliases;
+      }
+    });
+    return upgraded;
+  }
+
+  function voiceCommandPhrases(type) {
+    var configured = state && state.voiceCommands && state.voiceCommands[type];
+    return (configured && configured.length ? configured : defaultVoiceCommands[type] || []).slice();
   }
 
   function applyMenuPrices(menu) {

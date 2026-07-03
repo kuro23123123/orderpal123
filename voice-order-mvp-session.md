@@ -754,3 +754,34 @@ Understanding checklist:
 - [x] Solution: ice-note phrases now include both normal and reversed forms, such as `ít đá`, `đá ít`, `nhiều đá`, and `đá nhiều`.
 - [x] Solution: if staff says two ice notes while correcting themselves, the parser uses the last one spoken.
 - [x] Impact: the third order column should now record `ít đá` or `nhiều đá` more reliably.
+
+## Stage 24: Voice Split And Send Commands
+
+Added voice commands for hands-free order flow during busy service.
+
+Understanding checklist:
+
+- [x] Problem: staff may not have time to tap `Tách món` or `Gửi bếp` while taking orders continuously.
+- [x] Solution: while direct mic is active, saying `xong` immediately splits the current spoken segment into `Order nháp` and keeps listening.
+- [x] Solution: saying `gửi`, `gửi bếp`, `ok`, or `okay` sends the current draft to the kitchen.
+- [x] Solution: if a staff member says more item text before `gửi`, the app parses that segment before sending.
+- [x] Design decision: voice-send keeps the waiter on the staff screen and keeps the mic session ready for the next order.
+- [x] Edge case: Chrome can emit interim and final transcripts for the same phrase, so command processing ignores duplicate late results briefly.
+- [x] Product decision: silence no longer splits an order; staff must say the configured split keyword.
+
+## Stage 25: Voice Draft Editing
+
+Extended the continuous mic session so staff can correct the draft without touching the phone.
+
+Understanding checklist:
+
+- [x] Desired flow: tap mic once, speak the order, visually check the draft, then use voice commands to edit and send.
+- [x] Solution: `tăng [món]` increases quantity in the draft.
+- [x] Solution: `giảm [món]` decreases quantity in the draft and removes the line if quantity reaches zero.
+- [x] Solution: `xóa [món]` removes that menu item from the draft.
+- [x] Solution: `thêm [món]` parses the named item and adds it to the draft; if it already exists, its quantity increases.
+- [x] Solution: `đổi [món cũ] thành [món mới]` replaces a draft item by voice.
+- [x] Solution: `order 1, đổi cafe đen thành cafe sữa` can edit an order that has already been sent to the kitchen.
+- [x] Solution: the Menu tab now includes editable recognition words for split, send, increase, decrease, remove, add, and replace commands.
+- [x] Edge case: edit commands only activate when they start the phrase and the following words match a menu item, reducing conflict with normal order words like `thêm đá`.
+- [x] Impact: after the initial phone check, staff can correct and submit the order by voice.

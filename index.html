@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#176f64">
     <title>Ghi Món Bằng Giọng Nói</title>
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="stylesheet" href="styles.css?v=ice1">
+    <link rel="stylesheet" href="styles.css?v=voiceedit2">
   </head>
   <body>
     <div class="app-shell">
@@ -57,7 +57,7 @@
               </div>
 
               <div class="meter"><span id="meter-bar"></span></div>
-              <p class="voice-help" id="speech-support">Bấm Nói món, nói tên món, app sẽ tự tách ra Order nháp sau khi bạn ngừng nói khoảng 1 giây.</p>
+              <p class="voice-help" id="speech-support">Bấm Nói món, nói order. Nói "xong" để tách, "tăng/giảm/xóa/thêm/đổi" để sửa, "gửi" hoặc "ok" để gửi bếp.</p>
 
               <label class="field-label" for="transcript-input">Nội dung order</label>
               <textarea id="transcript-input" rows="7" spellcheck="false" autocapitalize="sentences" placeholder="Ví dụ: Ghi món, hai cà phê sữa đá và một bạc xỉu"></textarea>
@@ -224,11 +224,28 @@
             </form>
           </section>
 
+          <section class="panel voice-command-editor" aria-labelledby="voice-command-title">
+            <div class="panel-heading">
+              <h3 id="voice-command-title">Từ nhận diện lệnh mic</h3>
+            </div>
+            <div class="voice-command-list" id="voice-command-list"></div>
+            <div class="control-row">
+              <button class="primary-action" type="button" id="save-voice-commands">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"></path>
+                  <path d="M17 21v-8H7v8"></path>
+                  <path d="M7 3v5h8"></path>
+                </svg>
+                Lưu lệnh mic
+              </button>
+            </div>
+          </section>
+
           <div class="menu-list" id="menu-list"></div>
         </section>
       </main>
     </div>
 
-    <script src="app.js?v=ice1"></script>
+    <script src="app.js?v=voiceedit2"></script>
   </body>
 </html>
