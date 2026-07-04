@@ -826,3 +826,16 @@ Understanding checklist:
 - [x] Solution: saying `xóa order 23` deletes the whole order from the kitchen and revenue data.
 - [x] Edge case: if the edited order has no items left, the app asks staff to use `xóa order [số]` instead of saving an empty order.
 - [x] Impact: sent-order correction now matches a real service flow: select order by voice, make one or more edits, then confirm once.
+
+## Stage 29: Voice Complete Kitchen Order
+
+Added a voice command to move a kitchen order to `Xong`.
+
+Understanding checklist:
+
+- [x] Problem: staff may finish packing a drink while their hands are busy, so tapping the kitchen status button can slow service.
+- [x] Solution: saying `order 23 hoàn thành` marks `ORD-0023` as `Xong`.
+- [x] Solution: the same order-number parser is reused, so phrases like `order hai mươi ba hoàn thành` also work.
+- [x] Solution: variants like `order 23 xong`, `order 23 làm xong`, and `order 23 done` are accepted.
+- [x] Edge case: if the same order is currently being edited in the draft, the app saves the edit first and then moves it to `Xong`.
+- [x] Impact: during rush service, staff can send, edit, delete, and complete kitchen orders without leaving the mic flow.

@@ -462,7 +462,7 @@
       }
     };
 
-    els.speechSupport.textContent = window.isSecureContext ? "Bấm Nói món, nói order. Nói 'xong' để tách hoặc cập nhật order đang sửa. Nói 'xóa order 23' để xóa order khỏi bếp." : "Bấm Nói món. Nếu trình duyệt chặn mic trên HTTP, cần chạy bản HTTPS local.";
+    els.speechSupport.textContent = window.isSecureContext ? "Bấm Nói món, nói order. Nói 'xong' để tách/cập nhật, 'order 23 hoàn thành' để chuyển Xong, 'xóa order 23' để xóa." : "Bấm Nói món. Nếu trình duyệt chặn mic trên HTTP, cần chạy bản HTTPS local.";
     setVoiceState("Chờ", "idle");
     setVoiceButtons(false);
   }
@@ -492,7 +492,7 @@
     listeningMode = "order";
     setVoiceState("Đang nghe", "listening");
     setVoiceButtons(true);
-    els.speechSupport.textContent = "Đang nghe. Nói order, nói 'xong' để tách hoặc cập nhật order đang sửa. Có thể nói 'xóa order 23'.";
+    els.speechSupport.textContent = "Đang nghe. Nói order, 'xong' để tách/cập nhật, 'order 23 hoàn thành' để chuyển Xong, hoặc 'xóa order 23'.";
     startRecognition();
   }
 
@@ -528,7 +528,7 @@
     }
     if (listeningMode === "idle") {
       setVoiceState("Chờ", "idle");
-      els.speechSupport.textContent = SpeechRecognition ? "Bấm Nói món, nói order. Nói 'xong' để tách hoặc cập nhật order đang sửa. Có thể nói 'xóa order 23'." : els.speechSupport.textContent;
+      els.speechSupport.textContent = SpeechRecognition ? "Bấm Nói món, nói order. Nói 'xong' để tách/cập nhật, 'order 23 hoàn thành' để chuyển Xong, hoặc 'xóa order 23'." : els.speechSupport.textContent;
     }
     setVoiceButtons(false);
   }
@@ -604,6 +604,22 @@
         })
         .catch(function () {
           restartOrderListeningAfterCommand("Chưa xóa được order. Kiểm tra kết nối rồi nói lại.");
+      });
+      return true;
+    }
+
+    var completeOrderCommand = findVoiceCompleteOrderCommand(rawText);
+    if (completeOrderCommand) {
+      voiceCommandProcessing = true;
+      clearVoiceAutoFinishTimer();
+      activeTranscript = "";
+      els.transcript.value = completeOrderCommand.rawRest;
+      completeOrderByVoice(completeOrderCommand.order)
+        .then(function (message) {
+          restartOrderListeningAfterCommand(message);
+        })
+        .catch(function () {
+          restartOrderListeningAfterCommand("Chưa chuyển được order sang xong. Kiểm tra kết nối rồi nói lại.");
         });
       return true;
     }
@@ -740,6 +756,64 @@
     }
 
     return null;
+  }
+
+  function findVoiceCompleteOrderCommand(rawText) {
+    var foldedText = stripLeadingCommandPunctuation(foldText(rawText || ""));
+    var orderRef = parseSpokenOrderReference(foldedText);
+    if (!orderRef) {
+      return null;
+    }
+
+    var rawRest = stripLeadingCommandPunctuation(foldedText.slice(orderRef.end));
+    if (!containsCompletionCommand(rawRest)) {
+      return null;
+    }
+
+    var order = orderRef.latest ? findLatestOrder() : findOrderBySpokenNumber(orderRef.value);
+    if (!order) {
+      return null;
+    }
+
+    return {
+      order: order,
+      rawRest: rawRest
+    };
+  }
+
+  function containsCompletionCommand(text) {
+    var foldedText = foldText(text || "");
+    var completionPhrases = [
+      "hoan thanh",
+      "hoan tat",
+      "lam xong",
+      "da xong",
+      "xong roi",
+      "xong",
+      "done"
+    ];
+
+    return completionPhrases.some(function (phrase) {
+      var regex = new RegExp("^" + escapeRegex(phrase).replace(/\s+/g, "\\s+") + "(?=$|[^\\p{L}\\p{N}])", "u");
+      return regex.test(foldedText);
+    });
+  }
+
+  function completeOrderByVoice(order) {
+    var targetOrder = order;
+    var targetOrderId = targetOrder.id;
+    var finishDraftFirst = state.editingOrderId === targetOrderId && state.draft.length;
+    var savePromise = finishDraftFirst ? postDraftOrder({ keepWaiter: true, voiceCommand: true }) : Promise.resolve(targetOrder);
+
+    return Promise.resolve(savePromise).then(function (updatedOrder) {
+      targetOrder = updatedOrder || state.orders.find(function (existing) {
+        return existing.id === targetOrderId;
+      }) || targetOrder;
+      return setOrderStatus(targetOrder.id, "done");
+    }).then(function () {
+      els.postFeedback.textContent = "Đã chuyển " + targetOrderId + " sang Xong.";
+      return "Đã chuyển " + targetOrderId + " sang Xong. Mic vẫn đang nghe.";
+    });
   }
 
   function deleteOrderByVoice(order) {
@@ -2618,7 +2692,7 @@
 
   function setOrderStatus(orderId, status) {
     if (state.serverMode) {
-      apiRequest("/api/orders/" + encodeURIComponent(orderId), {
+      return apiRequest("/api/orders/" + encodeURIComponent(orderId), {
         method: "PATCH",
         body: JSON.stringify({ status: status })
       }).then(function (updatedOrder) {
@@ -2627,20 +2701,24 @@
         });
         saveJson(STORAGE_KEYS.orders, state.orders);
         renderKitchen();
+        return updatedOrder;
       }).catch(function () {
         setSyncStatus("Không kết nối được server. Chưa đổi trạng thái.", "local");
+        throw new Error("Không đổi được trạng thái.");
       });
-      return;
     }
 
+    var updated = null;
     state.orders = state.orders.map(function (order) {
       if (order.id !== orderId) {
         return order;
       }
-      return Object.assign({}, order, { status: status });
+      updated = Object.assign({}, order, { status: status });
+      return updated;
     });
     saveJson(STORAGE_KEYS.orders, state.orders);
     renderKitchen();
+    return Promise.resolve(updated);
   }
 
   function clearDoneOrders() {
