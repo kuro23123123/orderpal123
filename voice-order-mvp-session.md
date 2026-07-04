@@ -812,3 +812,17 @@ Understanding checklist:
 - [x] Solution: staff can say `order mới nhất ...` or `order vừa gửi ...` to edit the newest sent order without remembering the exact number.
 - [x] Edge case: if saving the edited order fails, the mic reports the failure and keeps listening instead of getting stuck.
 - [x] Impact: commands like `order một đổi cafe đen thành cafe sữa` should update the kitchen order directly.
+
+## Stage 28: Confirmed Voice Editing For Sent Orders
+
+Changed sent-order voice editing from immediate save to staged editing.
+
+Understanding checklist:
+
+- [x] Problem: directly saving after the first voice edit made it hard for staff to make multiple corrections in one pass.
+- [x] Solution: voice commands like `order 23 đổi cafe đen thành cafe sữa` now load that sent order into the draft editor and apply the change locally first.
+- [x] Solution: the mic keeps listening after each edit, so staff can continue with `thêm`, `xóa`, `tăng`, `giảm`, or `đổi`.
+- [x] Solution: saying `xong` while an existing order is being edited updates the kitchen order.
+- [x] Solution: saying `xóa order 23` deletes the whole order from the kitchen and revenue data.
+- [x] Edge case: if the edited order has no items left, the app asks staff to use `xóa order [số]` instead of saving an empty order.
+- [x] Impact: sent-order correction now matches a real service flow: select order by voice, make one or more edits, then confirm once.
