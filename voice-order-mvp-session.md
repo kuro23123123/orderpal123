@@ -839,3 +839,66 @@ Understanding checklist:
 - [x] Solution: variants like `order 23 xong`, `order 23 làm xong`, and `order 23 done` are accepted.
 - [x] Edge case: if the same order is currently being edited in the draft, the app saves the edit first and then moves it to `Xong`.
 - [x] Impact: during rush service, staff can send, edit, delete, and complete kitchen orders without leaving the mic flow.
+
+## Stage 30: Wake Word Gate For Direct Mic
+
+Added a `ghi món` wake phrase so background speech is ignored.
+
+Understanding checklist:
+
+- [x] Problem: continuous mic can accidentally hear customers, greetings, or staff chatter and mix that speech into the next order.
+- [x] Product decision: direct mic should listen continuously but only start processing after the staff says `ghi món`.
+- [x] Solution: pressing `Nói món` now enters `Chờ ghi món` mode instead of immediately recording order text.
+- [x] Solution: text before `ghi món` is ignored and does not appear in `Nội dung order`.
+- [x] Solution: commands now use the same gate, such as `ghi món gửi`, `ghi món order 23 hoàn thành`, or `ghi món xóa order 23`.
+- [x] Solution: after each voice command completes, the mic returns to `Chờ ghi món`.
+- [x] Edge case: if staff says only `ghi món`, the next spoken segment is accepted until a command like `xong` is handled.
+- [x] Impact: this trades one extra short phrase for much lower risk of accidental orders during crowded service.
+
+## Stage 31: One-Breath Rush Send
+
+Added the fastest practical voice path for rush service.
+
+Understanding checklist:
+
+- [x] Problem: the safe flow `ghi món [order] xong` then `ghi món gửi` costs an extra command.
+- [x] Solution: staff can now say `ghi món [order] gửi` to parse and send to the kitchen in one phrase.
+- [x] Product decision: no confirmation step is added after send because that would slow the rush workflow.
+- [x] Edge case: if the item text before `gửi` is not understood, the app does not send the old draft by mistake.
+- [x] Edge case: saying `ghi món gửi` still sends the existing checked draft.
+- [x] Impact: safe mode still exists with `xong`, but trained staff can use one-breath send when speed matters.
+
+## Stage 32: Internal Operations Dashboard
+
+Added an internal dashboard for measuring whether the app is actually helping during service.
+
+Understanding checklist:
+
+- [x] Problem: without instrumentation, we cannot know whether voice ordering is faster or just more impressive in demos.
+- [x] Solution: a `Dashboard` tab now summarizes operational metrics by date.
+- [x] Metric: `Order gửi bếp` counts successful send events recorded after this feature is enabled.
+- [x] Metric: `TB ghi món -> gửi` measures time from recognized `ghi món` to successful kitchen send.
+- [x] Metric: `Không nghe rõ` counts voice segments that were unclear or produced no menu item.
+- [x] Metric: `Sửa order` counts successful add/remove/increase/decrease/replace edits.
+- [x] Metric: `Order bị xóa` counts full-order deletes.
+- [x] Metric: `Click nhân viên` counts operational button clicks outside the dashboard itself.
+- [x] Metric: `Nói lại cùng order` counts unclear attempts inside the active voice order session.
+- [x] Design decision: analytics events sync to the local server when available and fall back to local device storage otherwise.
+- [x] Edge case: existing historical orders before this feature may not have analytics events, so the dashboard is best used from this point onward.
+
+## Stage 33: Daily Order Number Reset
+
+Added automatic daily reset and a manual reset button for visible order numbers.
+
+Understanding checklist:
+
+- [x] Problem: if order numbers keep increasing forever, staff and kitchen eventually have to call out large numbers that are harder to remember.
+- [x] Problem: simply reusing the same `id` such as `ORD-0001` every day would break edit, delete, complete, and revenue logic because two orders could share the same real identifier.
+- [x] Solution: the app now separates the internal order `id` from the visible kitchen number.
+- [x] Solution: the visible number resets by business date, so the first order of a new day shows as `ORD-0001`.
+- [x] Solution: the internal `id` includes the date and a unique suffix, so old orders stay safe even when the visible number repeats on another day.
+- [x] Solution: Dashboard now has a `Reset số order` button for manual reset during setup, testing, or the start of a fresh shift.
+- [x] Edge case: when upgrading from older data that already has a sequence but no sequence date, the app preserves the current sequence instead of suddenly resetting in the middle of service.
+- [x] Edge case: manual reset can create another visible `ORD-0001` on the same day; voice lookup prefers today's newest active order, but the button should mainly be used before taking real orders.
+- [x] Edge case: `order mới nhất` now uses the newest active order by time, not the largest visible number, because the largest number may belong to an older day before reset.
+- [x] Impact: staff and kitchen keep short daily order numbers while the app still has stable internal IDs for editing, deleting, completion, revenue, and analytics.

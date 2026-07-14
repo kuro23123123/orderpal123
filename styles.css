@@ -874,6 +874,10 @@ input:focus {
   margin-bottom: 14px;
 }
 
+.dashboard-summary {
+  grid-template-columns: repeat(7, minmax(112px, 1fr));
+}
+
 .metric {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -906,6 +910,27 @@ input:focus {
 
 .revenue-row strong {
   font-size: 18px;
+  white-space: nowrap;
+}
+
+.dashboard-event-list {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-event {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.dashboard-event strong {
+  color: var(--muted);
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -945,13 +970,14 @@ input:focus {
   .view-tabs {
     width: 100%;
     grid-auto-flow: column;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
   }
 
   .waiter-layout,
   .kitchen-board,
   .menu-form,
-  .revenue-summary {
+  .revenue-summary,
+  .dashboard-summary {
     grid-template-columns: 1fr;
   }
 

@@ -5,12 +5,12 @@
     menu: "voiceKitchen.menu.v1",
     orders: "voiceKitchen.orders.v1",
     sequence: "voiceKitchen.sequence.v1",
+    sequenceDate: "voiceKitchen.sequenceDate.v1",
     deviceName: "voiceKitchen.deviceName.v1",
-    voiceCommands: "voiceKitchen.voiceCommands.v1"
+    voiceCommands: "voiceKitchen.voiceCommands.v1",
+    analytics: "voiceKitchen.analytics.v1"
   };
 
-  var PRIMARY_WAKE_PHRASE = "ghi món";
-  var WAKE_PHRASES = ["ghi món", "ghi mon", "bếp ơi", "bep oi", "hey chef"];
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   var recognition = null;
   var listeningMode = "idle";
@@ -18,7 +18,10 @@
   var voiceAutoFinishTimer = null;
   var lastVoiceParseText = "";
   var voiceCommandProcessing = false;
+  var pendingWakeStartedAt = null;
+  var activeOrderSession = null;
   var defaultVoiceCommands = {
+    wake: ["ghi món", "ghi mon", "nhận món", "nhan mon", "bếp ơi", "bep oi"],
     split: ["xong"],
     send: ["gửi bếp", "gui bep", "gửi", "gui", "ok", "okay", "ô kê", "o ke"],
     increase: ["tăng số", "tang so", "tăng", "tang", "cộng", "cong"],
@@ -28,6 +31,7 @@
     replace: ["đổi", "doi", "đổi món", "doi mon", "thay", "thay món", "thay mon"]
   };
   var voiceCommandGroups = [
+    { type: "wake", label: "Từ kích hoạt ghi món", hint: "Bắt buộc nói trước order hoặc lệnh. Ví dụ: ghi món, nhận món, bếp ơi" },
     { type: "split", label: "Tách món", hint: "Ví dụ: xong" },
     { type: "send", label: "Gửi bếp", hint: "Ví dụ: gửi, ok" },
     { type: "increase", label: "Tăng số món", hint: "Ví dụ: tăng, cộng" },
@@ -224,6 +228,7 @@
     menu: upgradeMenu(loadJson(STORAGE_KEYS.menu, defaultMenu)),
     voiceCommands: upgradeVoiceCommands(loadJson(STORAGE_KEYS.voiceCommands, defaultVoiceCommands)),
     orders: loadJson(STORAGE_KEYS.orders, []),
+    analytics: loadJson(STORAGE_KEYS.analytics, []),
     draft: [],
     editingOrderId: null,
     serverMode: false
@@ -240,6 +245,7 @@
     els.deviceName.value = localStorage.getItem(STORAGE_KEYS.deviceName) || "";
     els.orderDate.value = todayDateKey();
     els.revenueDate.value = todayDateKey();
+    els.dashboardDate.value = todayDateKey();
     renderAll();
     refreshStateFromServer(true);
     window.setInterval(function () {
@@ -287,6 +293,20 @@
     els.revenueOwnBottles = document.getElementById("revenue-own-bottles");
     els.revenueBreakdown = document.getElementById("revenue-breakdown");
     els.revenueEmpty = document.getElementById("revenue-empty");
+    els.dashboardDate = document.getElementById("dashboard-date");
+    els.dashboardOrders = document.getElementById("dashboard-orders");
+    els.dashboardAvgTime = document.getElementById("dashboard-avg-time");
+    els.dashboardUnclear = document.getElementById("dashboard-unclear");
+    els.dashboardEdits = document.getElementById("dashboard-edits");
+    els.dashboardDeleted = document.getElementById("dashboard-deleted");
+    els.dashboardClicks = document.getElementById("dashboard-clicks");
+    els.dashboardRepeats = document.getElementById("dashboard-repeats");
+    els.dashboardEvents = document.getElementById("dashboard-events");
+    els.dashboardEmpty = document.getElementById("dashboard-empty");
+    els.resetOrderSequence = document.getElementById("reset-order-sequence");
+    els.sequenceResetFeedback = document.getElementById("sequence-reset-feedback");
+    els.resetOrderSequenceButtons = document.querySelectorAll("[data-reset-order-sequence]");
+    els.sequenceResetFeedbacks = document.querySelectorAll("[data-sequence-reset-feedback]");
   }
 
   function bindEvents() {
@@ -306,6 +326,11 @@
     els.postOrder.addEventListener("click", postDraftOrder);
     els.deleteOrder.addEventListener("click", deleteEditingOrder);
     els.revenueDate.addEventListener("change", renderRevenue);
+    els.dashboardDate.addEventListener("change", renderDashboard);
+    els.resetOrderSequenceButtons.forEach(function (button) {
+      button.addEventListener("click", resetOrderSequenceManually);
+    });
+    document.addEventListener("click", trackEmployeeClick, true);
     els.deviceName.addEventListener("input", function () {
       localStorage.setItem(STORAGE_KEYS.deviceName, els.deviceName.value.trim());
     });
@@ -335,6 +360,10 @@
           renderVoiceCommandEditor();
         }
       }
+      if (event.key === STORAGE_KEYS.analytics) {
+        state.analytics = loadJson(STORAGE_KEYS.analytics, []);
+        renderDashboard();
+      }
     });
   }
 
@@ -345,9 +374,11 @@
         state.menu = data.menu || state.menu;
         state.voiceCommands = upgradeVoiceCommands(data.voiceCommands || state.voiceCommands);
         state.orders = data.orders || [];
+        state.analytics = normalizeAnalyticsEvents(data.analytics || state.analytics);
         saveJson(STORAGE_KEYS.menu, state.menu);
         saveJson(STORAGE_KEYS.voiceCommands, state.voiceCommands);
         saveJson(STORAGE_KEYS.orders, state.orders);
+        saveJson(STORAGE_KEYS.analytics, state.analytics);
         setSyncStatus("Đã đồng bộ với máy chủ local của quán.", "online");
         renderKitchen();
         if (!isEditingMenuAliases()) {
@@ -357,6 +388,7 @@
           renderVoiceCommandEditor();
         }
         renderRevenue();
+        renderDashboard();
       })
       .catch(function () {
         state.serverMode = false;
@@ -382,6 +414,130 @@
       }
       return response.json();
     });
+  }
+
+  function recordAnalytics(type, details) {
+    var event = normalizeAnalyticsEvent(Object.assign({}, details || {}, {
+      type: type,
+      at: new Date().toISOString(),
+      businessDate: todayDateKey(),
+      device: els.deviceName ? els.deviceName.value.trim() : ""
+    }));
+
+    state.analytics = normalizeAnalyticsEvents([event].concat(state.analytics || []));
+    saveJson(STORAGE_KEYS.analytics, state.analytics);
+    renderDashboard();
+
+    if (!state.serverMode) {
+      return Promise.resolve(event);
+    }
+
+    return apiRequest("/api/analytics", {
+      method: "POST",
+      body: JSON.stringify(event)
+    }).then(function (data) {
+      state.analytics = normalizeAnalyticsEvents(data.analytics || state.analytics);
+      saveJson(STORAGE_KEYS.analytics, state.analytics);
+      renderDashboard();
+      return event;
+    }).catch(function () {
+      return event;
+    });
+  }
+
+  function normalizeAnalyticsEvents(events) {
+    var seen = {};
+    return (events || []).map(normalizeAnalyticsEvent).filter(function (event) {
+      if (!event.id || seen[event.id]) {
+        return false;
+      }
+      seen[event.id] = true;
+      return true;
+    }).sort(function (a, b) {
+      return new Date(b.at).getTime() - new Date(a.at).getTime();
+    }).slice(0, 1500);
+  }
+
+  function normalizeAnalyticsEvent(event) {
+    var raw = event || {};
+    return {
+      id: String(raw.id || analyticsEventId()),
+      type: String(raw.type || "event"),
+      at: raw.at && !Number.isNaN(new Date(raw.at).getTime()) ? raw.at : new Date().toISOString(),
+      businessDate: normalizeDateKey(raw.businessDate) || dateKeyFromValue(raw.at) || todayDateKey(),
+      orderId: raw.orderId ? String(raw.orderId) : "",
+      durationMs: Number.isFinite(Number(raw.durationMs)) ? Math.max(0, Number(raw.durationMs)) : null,
+      repeats: Number.isFinite(Number(raw.repeats)) ? Math.max(0, Number(raw.repeats)) : 0,
+      source: raw.source ? String(raw.source) : "",
+      command: raw.command ? String(raw.command) : "",
+      target: raw.target ? String(raw.target) : "",
+      device: raw.device ? String(raw.device) : ""
+    };
+  }
+
+  function analyticsEventId() {
+    return "evt_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+  }
+
+  function trackEmployeeClick(event) {
+    var button = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!button || button.disabled) {
+      return;
+    }
+    if (button.dataset.viewButton === "dashboard" || button.closest('[data-view="dashboard"]')) {
+      return;
+    }
+
+    recordAnalytics("employee_click", {
+      target: button.id || button.dataset.viewButton || button.dataset.orderStatus || button.dataset.menuAction || button.textContent.trim().slice(0, 40)
+    });
+  }
+
+  function startVoiceOrderSession() {
+    pendingWakeStartedAt = Date.now();
+  }
+
+  function ensureVoiceOrderSession() {
+    if (!activeOrderSession) {
+      activeOrderSession = {
+        startedAt: pendingWakeStartedAt || Date.now(),
+        repeats: 0
+      };
+    }
+    return activeOrderSession;
+  }
+
+  function recordVoiceUnclear(rawText) {
+    var session = ensureVoiceOrderSession();
+    session.repeats += 1;
+    recordAnalytics("voice_unclear", {
+      source: "mic",
+      target: String(rawText || "").slice(0, 80)
+    });
+    recordAnalytics("voice_repeat", {
+      source: "mic",
+      repeats: session.repeats,
+      target: String(rawText || "").slice(0, 80)
+    });
+  }
+
+  function finishVoiceOrderSession(orderId, source) {
+    var session = activeOrderSession;
+    var durationMs = session ? Date.now() - session.startedAt : null;
+    var repeats = session ? session.repeats : 0;
+    activeOrderSession = null;
+    pendingWakeStartedAt = null;
+    recordAnalytics("order_sent", {
+      orderId: orderId,
+      durationMs: durationMs,
+      repeats: repeats,
+      source: source || ""
+    });
+  }
+
+  function resetVoiceOrderSession() {
+    activeOrderSession = null;
+    pendingWakeStartedAt = null;
   }
 
   function setSyncStatus(message, mode) {
@@ -421,6 +577,15 @@
 
       if (interimText.trim() && !voiceCommandProcessing) {
         var previewText = buildSpeechPreview(activeTranscript, interimText.trim());
+        if (listeningMode === "wake") {
+          var wakePreview = textAfterWakePhrase(previewText);
+          els.transcript.value = wakePreview ? wakePreview : "";
+          return;
+        }
+        if (listeningMode === "order" && !findWakePhrase(interimText) && isBareVoiceCommand(interimText, "send")) {
+          els.transcript.value = "";
+          return;
+        }
         els.transcript.value = previewText;
         handleVoiceCommandIfPresent(previewText);
       }
@@ -462,7 +627,7 @@
       }
     };
 
-    els.speechSupport.textContent = window.isSecureContext ? "Bấm Nói món, nói order. Nói 'xong' để tách/cập nhật, 'order 23 hoàn thành' để chuyển Xong, 'xóa order 23' để xóa." : "Bấm Nói món. Nếu trình duyệt chặn mic trên HTTP, cần chạy bản HTTPS local.";
+    els.speechSupport.textContent = window.isSecureContext ? "Bấm Nói món, rồi nói 'ghi món sữa đá gửi' để gửi nhanh hoặc 'ghi món sữa đá xong' để kiểm tra nháp." : "Bấm Nói món. Nếu trình duyệt chặn mic trên HTTP, cần chạy bản HTTPS local.";
     setVoiceState("Chờ", "idle");
     setVoiceButtons(false);
   }
@@ -489,10 +654,10 @@
     activeTranscript = "";
     voiceCommandProcessing = false;
     els.transcript.value = "";
-    listeningMode = "order";
-    setVoiceState("Đang nghe", "listening");
+    listeningMode = "wake";
+    setVoiceState("Chờ ghi món", "listening");
     setVoiceButtons(true);
-    els.speechSupport.textContent = "Đang nghe. Nói order, 'xong' để tách/cập nhật, 'order 23 hoàn thành' để chuyển Xong, hoặc 'xóa order 23'.";
+    els.speechSupport.textContent = "Đang nghe nhưng chưa ghi. Nói 'ghi món sữa đá gửi' để gửi nhanh hoặc 'ghi món sữa đá xong' để kiểm tra nháp.";
     startRecognition();
   }
 
@@ -528,7 +693,7 @@
     }
     if (listeningMode === "idle") {
       setVoiceState("Chờ", "idle");
-      els.speechSupport.textContent = SpeechRecognition ? "Bấm Nói món, nói order. Nói 'xong' để tách/cập nhật, 'order 23 hoàn thành' để chuyển Xong, hoặc 'xóa order 23'." : els.speechSupport.textContent;
+      els.speechSupport.textContent = SpeechRecognition ? "Bấm Nói món, rồi nói 'ghi món sữa đá gửi' để gửi nhanh hoặc 'ghi món sữa đá xong' để kiểm tra nháp." : els.speechSupport.textContent;
     }
     setVoiceButtons(false);
   }
@@ -571,6 +736,7 @@
       return Promise.resolve(false);
     }
 
+    ensureVoiceOrderSession();
     activeTranscript = "";
     els.transcript.value = "";
     lastVoiceParseText = text;
@@ -579,6 +745,10 @@
       keepListening: listeningMode === "order",
       statusText: statusText || "Đã tách đoạn vừa nghe. Mic vẫn đang nghe."
     }).then(function (result) {
+      var parsedItems = result && result.result && result.result.items;
+      if (!result || !result.ok || !parsedItems || !parsedItems.length) {
+        recordVoiceUnclear(text);
+      }
       if (listeningMode === "order") {
         setVoiceState("Đang nghe", "listening");
         setVoiceButtons(true);
@@ -677,9 +847,19 @@
       return true;
     }
 
-    parseActiveVoiceSegment("Đã nghe lệnh gửi. Đang gửi order lên bếp.").then(function () {
-      sendDraftByVoice();
-    });
+    if (beforeCommand) {
+      parseActiveVoiceSegment("Đã nghe lệnh gửi nhanh. Đang tách món rồi gửi bếp.").then(function (parseResult) {
+        var parsedItems = parseResult && parseResult.result && parseResult.result.items;
+        if (parseResult && parseResult.ok && parsedItems && parsedItems.length) {
+          sendDraftByVoice();
+          return;
+        }
+        restartOrderListeningAfterCommand("Không nghe rõ món trước lệnh gửi. Chưa gửi bếp.");
+      });
+      return true;
+    }
+
+    sendDraftByVoice();
     return true;
   }
 
@@ -705,6 +885,7 @@
 
   function finishEditingOrderByVoice() {
     var editingOrderId = state.editingOrderId;
+    var editingLabel = displayOrderIdById(editingOrderId);
     if (!editingOrderId) {
       return Promise.resolve("Không có order đang sửa. Mic vẫn đang nghe.");
     }
@@ -716,10 +897,10 @@
 
     return Promise.resolve(postDraftOrder({ keepWaiter: true, voiceCommand: true }))
       .then(function () {
-        return "Đã cập nhật " + editingOrderId + ". Mic vẫn đang nghe.";
+        return "Đã cập nhật " + editingLabel + ". Mic vẫn đang nghe.";
       })
       .catch(function () {
-        return "Chưa cập nhật được " + editingOrderId + ". Kiểm tra kết nối rồi nói 'xong' lại.";
+        return "Chưa cập nhật được " + editingLabel + ". Kiểm tra kết nối rồi nói 'xong' lại.";
       });
   }
 
@@ -802,6 +983,7 @@
   function completeOrderByVoice(order) {
     var targetOrder = order;
     var targetOrderId = targetOrder.id;
+    var targetOrderLabel = displayOrderId(targetOrder);
     var finishDraftFirst = state.editingOrderId === targetOrderId && state.draft.length;
     var savePromise = finishDraftFirst ? postDraftOrder({ keepWaiter: true, voiceCommand: true }) : Promise.resolve(targetOrder);
 
@@ -811,27 +993,29 @@
       }) || targetOrder;
       return setOrderStatus(targetOrder.id, "done");
     }).then(function () {
-      els.postFeedback.textContent = "Đã chuyển " + targetOrderId + " sang Xong.";
-      return "Đã chuyển " + targetOrderId + " sang Xong. Mic vẫn đang nghe.";
+      els.postFeedback.textContent = "Đã chuyển " + targetOrderLabel + " sang Xong.";
+      return "Đã chuyển " + targetOrderLabel + " sang Xong. Mic vẫn đang nghe.";
     });
   }
 
   function deleteOrderByVoice(order) {
     var orderId = order.id;
+    var orderLabel = displayOrderId(order);
     if (state.serverMode) {
       return apiRequest("/api/orders/" + encodeURIComponent(orderId), {
         method: "DELETE"
       }).then(function (data) {
-        removeDeletedOrderFromState(orderId, data.orders);
-        return "Đã xóa " + orderId + " khỏi bếp. Mic vẫn đang nghe.";
+        removeDeletedOrderFromState(orderId, data.orders, "voice");
+        return "Đã xóa " + orderLabel + " khỏi bếp. Mic vẫn đang nghe.";
       });
     }
 
-    removeDeletedOrderFromState(orderId);
-    return Promise.resolve("Đã xóa " + orderId + " khỏi bếp. Mic vẫn đang nghe.");
+    removeDeletedOrderFromState(orderId, null, "voice");
+    return Promise.resolve("Đã xóa " + orderLabel + " khỏi bếp. Mic vẫn đang nghe.");
   }
 
-  function removeDeletedOrderFromState(orderId, serverOrders) {
+  function removeDeletedOrderFromState(orderId, serverOrders, source) {
+    var orderLabel = displayOrderIdById(orderId);
     state.orders = Array.isArray(serverOrders) ? serverOrders : state.orders.filter(function (existing) {
       return existing.id !== orderId;
     });
@@ -843,7 +1027,11 @@
     }
     renderKitchen();
     renderRevenue();
-    els.postFeedback.textContent = "Đã xóa " + orderId + ".";
+    els.postFeedback.textContent = "Đã xóa " + orderLabel + ".";
+    recordAnalytics("order_deleted", {
+      orderId: orderId,
+      source: source || ""
+    });
   }
 
   function ensureEditingOrderDraft(order) {
@@ -869,6 +1057,7 @@
       addParsedItemsToDraft(parsedItems, true);
       renderDraft({ raw: command.targetText, needsReview: command.parseResult.needsReview });
       scrollDraftIntoView();
+      recordOrderEdit(command.type, parsedItems[0] && parsedItems[0].name, "voice");
       return Promise.resolve("Đã thêm món. Mic vẫn đang nghe.");
     }
 
@@ -908,6 +1097,7 @@
 
     renderDraft({ raw: command.targetText, needsReview: false });
     scrollDraftIntoView();
+    recordOrderEdit(command.type, target.name, "voice");
 
     if (command.type === "increase") {
       return Promise.resolve("Đã tăng " + target.name + ". Mic vẫn đang nghe.");
@@ -943,13 +1133,23 @@
     addParsedItemsToDraft([Object.assign({}, replacement, { quantity: removedQuantity })], true);
     renderDraft({ raw: command.targetText, needsReview: command.replacementResult.needsReview });
     scrollDraftIntoView();
+    recordOrderEdit("replace", removedName + " -> " + replacement.name, "voice");
     return Promise.resolve("Đã đổi " + removedName + " thành " + replacement.name + ". Mic vẫn đang nghe.");
+  }
+
+  function recordOrderEdit(command, target, source) {
+    recordAnalytics("order_edit", {
+      orderId: state.editingOrderId || "",
+      command: command || "",
+      target: target || "",
+      source: source || ""
+    });
   }
 
   function applySentOrderEditCommand(order, command) {
     ensureEditingOrderDraft(order);
     return applyDraftEditCommand(command).then(function (message) {
-      els.postFeedback.textContent = "Đang sửa " + order.id + ". Nói tiếp để sửa thêm hoặc nói 'xong' để cập nhật bếp.";
+      els.postFeedback.textContent = "Đang sửa " + displayOrderId(order) + ". Nói tiếp để sửa thêm hoặc nói 'xong' để cập nhật bếp.";
       return message + " Chưa cập nhật bếp. Nói tiếp để sửa thêm hoặc nói 'xong' để cập nhật bếp.";
     });
   }
@@ -972,12 +1172,12 @@
     }, []);
 
     if (!removedQuantity) {
-      return Promise.resolve("Không thấy " + source.name + " trong " + order.id + ".");
+      return Promise.resolve("Không thấy " + source.name + " trong " + displayOrderId(order) + ".");
     }
 
     items.push(Object.assign({}, replacement, { quantity: removedQuantity }));
     return saveVoiceEditedOrder(order, items).then(function () {
-      return "Đã đổi " + removedName + " thành " + replacement.name + " trong " + order.id + ".";
+      return "Đã đổi " + removedName + " thành " + replacement.name + " trong " + displayOrderId(order) + ".";
     });
   }
 
@@ -1015,7 +1215,7 @@
         saveJson(STORAGE_KEYS.orders, state.orders);
         renderKitchen();
         renderRevenue();
-        els.postFeedback.textContent = "Đã sửa " + updatedOrder.id + ".";
+        els.postFeedback.textContent = "Đã sửa " + displayOrderId(updatedOrder) + ".";
         return updatedOrder;
       });
     }
@@ -1038,7 +1238,7 @@
     saveJson(STORAGE_KEYS.orders, state.orders);
     renderKitchen();
     renderRevenue();
-    els.postFeedback.textContent = "Đã sửa " + order.id + ".";
+    els.postFeedback.textContent = "Đã sửa " + displayOrderId(order) + ".";
     return Promise.resolve(order);
   }
 
@@ -1068,14 +1268,15 @@
     activeTranscript = "";
     lastVoiceParseText = "";
     els.transcript.value = "";
-    if (listeningMode !== "order") {
+    if (listeningMode !== "order" && listeningMode !== "wake") {
       voiceCommandProcessing = false;
       return;
     }
 
-    setVoiceState("Đang nghe", "listening");
+    listeningMode = "wake";
+    setVoiceState("Chờ ghi món", "listening");
     setVoiceButtons(true);
-    els.speechSupport.textContent = message || "Mic vẫn đang nghe. Nói món tiếp hoặc nói 'gửi'.";
+    els.speechSupport.textContent = (message || "Mic vẫn đang nghe.") + " Chờ câu bắt đầu bằng 'ghi món'.";
     window.setTimeout(function () {
       voiceCommandProcessing = false;
     }, 260);
@@ -1296,27 +1497,43 @@
       return null;
     }
 
-    var paddedId = "ORD-" + String(orderNumber).padStart(4, "0");
-    return state.orders.find(function (order) {
-      return order.id === paddedId;
-    }) || state.orders.find(function (order) {
-      var match = String(order.id || "").match(/(\d+)$/);
-      return match && parseInt(match[1], 10) === orderNumber;
-    }) || null;
+    var today = todayDateKey();
+    var candidates = (state.orders || []).filter(function (order) {
+      return orderNumberForLookup(order) === orderNumber;
+    });
+    return candidates.find(function (order) {
+      return orderBusinessDate(order) === today && !order.hiddenFromKitchen;
+    }) || candidates.find(function (order) {
+      return !order.hiddenFromKitchen;
+    }) || candidates[0] || null;
+  }
+
+  function orderNumberForLookup(order) {
+    var number = orderNumber(order);
+    return Number.isFinite(number) ? number : Number.MAX_SAFE_INTEGER;
   }
 
   function spokenOrderNumberLabel(orderId) {
+    var order = (state.orders || []).find(function (item) {
+      return item.id === orderId;
+    });
+    if (order) {
+      return String(orderNumber(order));
+    }
     var match = String(orderId || "").match(/(\d+)$/);
     return match ? String(parseInt(match[1], 10)) : String(orderId || "");
   }
 
   function findLatestOrder() {
-    return (state.orders || []).slice().sort(function (a, b) {
-      var numberA = orderNumber(a);
-      var numberB = orderNumber(b);
-      if (numberA !== numberB) {
-        return numberB - numberA;
-      }
+    var today = todayDateKey();
+    var activeOrders = (state.orders || []).filter(function (order) {
+      return !order.hiddenFromKitchen;
+    });
+    var todayOrders = activeOrders.filter(function (order) {
+      return orderBusinessDate(order) === today;
+    });
+    var source = todayOrders.length ? todayOrders : activeOrders;
+    return source.slice().sort(function (a, b) {
       return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
     })[0] || null;
   }
@@ -1583,6 +1800,29 @@
       return;
     }
 
+    if (listeningMode === "order") {
+      if (findWakePhrase(text)) {
+        startVoiceOrderSession();
+        activeTranscript = stripWakePhrase(text).trim();
+        els.transcript.value = activeTranscript;
+        setVoiceState("Ghi món", "listening");
+        if (activeTranscript && !handleVoiceCommandIfPresent(activeTranscript)) {
+          els.transcript.value = activeTranscript;
+        }
+        return;
+      }
+
+      if (isBareVoiceCommand(text, "send")) {
+        activeTranscript = "";
+        els.transcript.value = "";
+        listeningMode = "wake";
+        setVoiceState("Chờ ghi món", "listening");
+        setVoiceButtons(true);
+        els.speechSupport.textContent = "Đã bỏ qua lệnh gửi vì thiếu từ kích hoạt. Nói 'ghi món gửi' để gửi bếp.";
+        return;
+      }
+    }
+
     var nextTranscript = appendSpeechPart(activeTranscript, text);
     if (nextTranscript === normalizeSpeechChunk(activeTranscript)) {
       return;
@@ -1598,20 +1838,29 @@
     if (listeningMode === "wake") {
       var wake = findWakePhrase(activeTranscript);
       if (!wake) {
+        els.transcript.value = "";
+        setVoiceState("Chờ ghi món", "listening");
+        els.speechSupport.textContent = "Mic đang bỏ qua tiếng nền. Nói 'ghi món' trước khi đọc order.";
         return;
       }
 
+      startVoiceOrderSession();
       var afterWake = stripWakePhrase(activeTranscript);
       if (afterWake.trim()) {
-        els.transcript.value = afterWake.trim();
-        parseAndSetDraft(afterWake);
-        stopListening();
+        activeTranscript = afterWake.trim();
+        els.transcript.value = activeTranscript;
+        listeningMode = "order";
+        setVoiceState("Ghi món", "listening");
+        els.speechSupport.textContent = "Đã nghe 'ghi món'. Đang nhận phần sau từ khóa.";
+        if (!handleVoiceCommandIfPresent(activeTranscript)) {
+          els.transcript.value = activeTranscript;
+        }
       } else {
         activeTranscript = "";
         els.transcript.value = "";
         listeningMode = "order";
         setVoiceState("Ghi món", "listening");
-        els.speechSupport.textContent = "Đang nghe món.";
+        els.speechSupport.textContent = "Đã kích hoạt. Đọc order rồi nói 'xong'.";
       }
       return;
     }
@@ -2128,6 +2377,7 @@
     renderMenu();
     renderVoiceCommandEditor();
     renderRevenue();
+    renderDashboard();
   }
 
   function renderDraft(parseResult) {
@@ -2145,7 +2395,7 @@
       if (parseResult && parseResult.tooUnclear) {
         els.draftNotice.textContent = "Không nghe rõ. Nói lại tên món ngắn hơn, ví dụ: sữa nhỏ ngọt ít đá.";
       } else {
-        els.draftNotice.textContent = state.editingOrderId ? "Đang sửa " + state.editingOrderId + ". Nhập lại order mới hoặc hủy để quay về tạo order mới." : (parseResult && parseResult.raw ? "Chưa tìm thấy món trong menu." : "Chưa có món nháp.");
+        els.draftNotice.textContent = state.editingOrderId ? "Đang sửa " + displayOrderIdById(state.editingOrderId) + ". Nhập lại order mới hoặc hủy để quay về tạo order mới." : (parseResult && parseResult.raw ? "Chưa tìm thấy món trong menu." : "Chưa có món nháp.");
       }
       els.draftNotice.classList.toggle("is-warning", Boolean(parseResult && parseResult.raw));
       return;
@@ -2156,7 +2406,7 @@
       els.draftNotice.hidden = false;
       els.draftNotice.textContent = "Không nghe rõ phần vừa nói. Order nháp hiện tại được giữ nguyên, hãy nói lại.";
     } else {
-      els.draftNotice.textContent = state.editingOrderId ? "Đang sửa " + state.editingOrderId + ". Kiểm tra lại trước khi cập nhật." : "Kiểm tra món gợi ý trước khi gửi bếp.";
+      els.draftNotice.textContent = state.editingOrderId ? "Đang sửa " + displayOrderIdById(state.editingOrderId) + ". Kiểm tra lại trước khi cập nhật." : "Kiểm tra món gợi ý trước khi gửi bếp.";
     }
     els.draftNotice.classList.toggle("is-warning", Boolean(parseResult && parseResult.needsReview));
 
@@ -2199,12 +2449,14 @@
   }
 
   function updateDraftItem(key, action) {
+    var changedItemName = "";
     state.draft = state.draft.reduce(function (items, item) {
       if (item.draftKey !== key) {
         items.push(item);
         return items;
       }
 
+      changedItemName = item.name;
       if (action === "remove") {
         return items;
       }
@@ -2221,6 +2473,9 @@
       }
       return items;
     }, []);
+    if (changedItemName) {
+      recordOrderEdit(action, changedItemName, "click");
+    }
     renderDraft();
   }
 
@@ -2297,6 +2552,7 @@
     els.orderLabel.value = "";
     els.postFeedback.textContent = "";
     state.editingOrderId = null;
+    resetVoiceOrderSession();
     renderDraft();
   }
 
@@ -2322,9 +2578,10 @@
       }).then(function (order) {
         state.orders.unshift(order);
         saveJson(STORAGE_KEYS.orders, state.orders);
+        finishVoiceOrderSession(order.id, options.voiceCommand ? "voice" : "click");
         clearDraft();
         renderKitchen();
-        els.postFeedback.textContent = "Đã gửi " + order.id + ".";
+        els.postFeedback.textContent = "Đã gửi " + displayOrderId(order) + ".";
         if (!keepWaiter) {
           setActiveView("kitchen");
         }
@@ -2337,8 +2594,12 @@
       });
     }
 
+    var identity = nextOrderIdentity(payload.businessDate);
     var order = {
-      id: nextOrderId(),
+      id: identity.id,
+      displayId: identity.displayId,
+      orderNumber: identity.orderNumber,
+      sequenceDate: identity.sequenceDate,
       createdAt: new Date().toISOString(),
       createdBy: payload.createdBy,
       label: payload.label,
@@ -2350,9 +2611,10 @@
 
     state.orders.unshift(order);
     saveJson(STORAGE_KEYS.orders, state.orders);
+    finishVoiceOrderSession(order.id, options.voiceCommand ? "voice" : "click");
     clearDraft();
     renderKitchen();
-    els.postFeedback.textContent = "Đã gửi " + order.id + ".";
+    els.postFeedback.textContent = "Đã gửi " + displayOrderId(order) + ".";
     if (!keepWaiter) {
       setActiveView("kitchen");
     }
@@ -2399,7 +2661,7 @@
         saveJson(STORAGE_KEYS.orders, state.orders);
         clearDraft();
         renderKitchen();
-        els.postFeedback.textContent = "Đã cập nhật " + updatedOrder.id + ".";
+        els.postFeedback.textContent = "Đã cập nhật " + displayOrderId(updatedOrder) + ".";
         if (!keepWaiter) {
           setActiveView("kitchen");
         }
@@ -2430,7 +2692,7 @@
     saveJson(STORAGE_KEYS.orders, state.orders);
     clearDraft();
     renderKitchen();
-    els.postFeedback.textContent = "Đã cập nhật " + editingOrderId + ".";
+    els.postFeedback.textContent = "Đã cập nhật " + displayOrderIdById(editingOrderId) + ".";
     if (!keepWaiter) {
       setActiveView("kitchen");
     }
@@ -2456,13 +2718,7 @@
       apiRequest("/api/orders/" + encodeURIComponent(editingOrderId), {
         method: "DELETE"
       }).then(function (data) {
-        state.orders = data.orders || state.orders.filter(function (order) {
-          return order.id !== editingOrderId;
-        });
-        saveJson(STORAGE_KEYS.orders, state.orders);
-        clearDraft();
-        renderKitchen();
-        renderRevenue();
+        removeDeletedOrderFromState(editingOrderId, data.orders, "click");
         els.postFeedback.textContent = "Đã xóa " + editingOrderId + ".";
         setActiveView("kitchen");
       }).catch(function (error) {
@@ -2474,13 +2730,7 @@
       return;
     }
 
-    state.orders = state.orders.filter(function (order) {
-      return order.id !== editingOrderId;
-    });
-    saveJson(STORAGE_KEYS.orders, state.orders);
-    clearDraft();
-    renderKitchen();
-    renderRevenue();
+    removeDeletedOrderFromState(editingOrderId, null, "click");
     els.postFeedback.textContent = "Đã xóa " + editingOrderId + ".";
     setActiveView("kitchen");
   }
@@ -2554,8 +2804,30 @@
   }
 
   function orderNumber(order) {
-    var match = String(order && order.id || "").match(/\d+/);
-    return match ? Number(match[0]) : Number.MAX_SAFE_INTEGER;
+    if (Number.isFinite(Number(order && order.orderNumber))) {
+      return Number(order.orderNumber);
+    }
+    var source = String(order && (order.displayId || order.id) || "");
+    var matches = source.match(/\d+/g);
+    return matches && matches.length ? Number(matches[matches.length - 1]) : Number.MAX_SAFE_INTEGER;
+  }
+
+  function displayOrderId(order) {
+    if (!order) {
+      return "";
+    }
+    if (order.displayId) {
+      return order.displayId;
+    }
+    var number = orderNumber(order);
+    return Number.isFinite(number) && number !== Number.MAX_SAFE_INTEGER ? "ORD-" + String(number).padStart(4, "0") : String(order.id || "");
+  }
+
+  function displayOrderIdById(orderId) {
+    var order = (state.orders || []).find(function (item) {
+      return item.id === orderId;
+    });
+    return order ? displayOrderId(order) : String(orderId || "");
   }
 
   function renderOrderCard(order) {
@@ -2586,7 +2858,7 @@
     card.innerHTML =
       '<div class="order-topline">' +
         '<div>' +
-          '<div class="order-id">' + escapeHtml(order.id) + '</div>' +
+          '<div class="order-id">' + escapeHtml(displayOrderId(order)) + '</div>' +
           label +
           saleDateInfo +
           '<div class="item-subtext">' + escapeHtml(order.createdBy) + '</div>' +
@@ -2664,7 +2936,7 @@
     els.orderDate.value = orderBusinessDate(order) || todayDateKey();
     els.orderLabel.value = order.label || "";
     els.transcript.value = "";
-    els.postFeedback.textContent = "Đang sửa " + order.id + ".";
+    els.postFeedback.textContent = "Đang sửa " + displayOrderId(order) + ".";
     renderDraft();
     setActiveView("waiter");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2923,6 +3195,163 @@
     });
   }
 
+  function renderDashboard() {
+    if (!els.dashboardEvents) {
+      return;
+    }
+
+    var selectedDate = els.dashboardDate.value || todayDateKey();
+    var events = (state.analytics || []).filter(function (event) {
+      return event.businessDate === selectedDate;
+    });
+    var sentEvents = events.filter(function (event) { return event.type === "order_sent"; });
+    var durations = sentEvents.map(function (event) {
+      return Number(event.durationMs);
+    }).filter(function (value) {
+      return Number.isFinite(value) && value > 0;
+    });
+    var averageDuration = durations.length ? durations.reduce(function (sum, value) {
+      return sum + value;
+    }, 0) / durations.length : null;
+
+    els.dashboardOrders.textContent = String(sentEvents.length);
+    els.dashboardAvgTime.textContent = averageDuration === null ? "-" : formatDuration(averageDuration);
+    els.dashboardUnclear.textContent = String(countDashboardEvents(events, "voice_unclear"));
+    els.dashboardEdits.textContent = String(countDashboardEvents(events, "order_edit"));
+    els.dashboardDeleted.textContent = String(countDashboardEvents(events, "order_deleted"));
+    els.dashboardClicks.textContent = String(countDashboardEvents(events, "employee_click"));
+    els.dashboardRepeats.textContent = String(countDashboardEvents(events, "voice_repeat"));
+
+    els.dashboardEvents.innerHTML = "";
+    els.dashboardEmpty.hidden = events.length > 0;
+
+    events.slice(0, 30).forEach(function (event) {
+      var row = document.createElement("article");
+      row.className = "dashboard-event";
+      row.innerHTML =
+        '<div>' +
+          '<div class="item-title">' + escapeHtml(analyticsEventTitle(event)) + '</div>' +
+          '<div class="item-subtext">' + escapeHtml(analyticsEventDetail(event)) + '</div>' +
+        '</div>' +
+        '<strong>' + escapeHtml(formatTime(event.at)) + '</strong>';
+      els.dashboardEvents.appendChild(row);
+    });
+  }
+
+  function resetOrderSequenceManually(event) {
+    var sourceButton = event && event.currentTarget;
+    var dateInputId = sourceButton && sourceButton.dataset ? sourceButton.dataset.sequenceDateInput : "";
+    var dateInput = dateInputId ? document.getElementById(dateInputId) : null;
+    var sequenceDate = normalizeDateKey(dateInput && dateInput.value) || normalizeDateKey(els.revenueDate && els.revenueDate.value) || todayDateKey();
+    if (!window.confirm("Reset số order ngày " + sequenceDate + " về ORD-0001 cho order kế tiếp?")) {
+      return;
+    }
+
+    setSequenceResetButtonsDisabled(true);
+    if (state.serverMode) {
+      apiRequest("/api/order-sequence/reset", {
+        method: "POST",
+        body: JSON.stringify({ sequenceDate: sequenceDate })
+      }).then(function (data) {
+        applySequenceReset(sequenceDate, data.sequence || 0);
+        showSequenceResetFeedback("Đã reset số order ngày " + sequenceDate + ". Order tiếp theo sẽ là ORD-0001.");
+      }).catch(function () {
+        showSequenceResetFeedback("Không reset được trên server. Kiểm tra kết nối rồi thử lại.");
+      }).finally(function () {
+        setSequenceResetButtonsDisabled(false);
+      });
+      return;
+    }
+
+    applySequenceReset(sequenceDate, 0);
+    showSequenceResetFeedback("Đã reset số order trên thiết bị này. Order tiếp theo sẽ là ORD-0001.");
+    setSequenceResetButtonsDisabled(false);
+  }
+
+  function setSequenceResetButtonsDisabled(disabled) {
+    if (!els.resetOrderSequenceButtons) {
+      return;
+    }
+    els.resetOrderSequenceButtons.forEach(function (button) {
+      button.disabled = disabled;
+    });
+  }
+
+  function applySequenceReset(sequenceDate, sequence) {
+    localStorage.setItem(STORAGE_KEYS.sequenceDate, sequenceDate);
+    localStorage.setItem(STORAGE_KEYS.sequence, String(Math.max(0, Number(sequence) || 0)));
+  }
+
+  function showSequenceResetFeedback(message) {
+    if (!els.sequenceResetFeedbacks || !els.sequenceResetFeedbacks.length) {
+      return;
+    }
+    els.sequenceResetFeedbacks.forEach(function (feedback) {
+      feedback.textContent = message;
+      feedback.classList.add("is-online");
+    });
+    window.setTimeout(function () {
+      els.sequenceResetFeedbacks.forEach(function (feedback) {
+        feedback.classList.remove("is-online");
+        feedback.textContent = "Số order tự reset khi qua ngày mới.";
+      });
+    }, 5000);
+  }
+
+  function countDashboardEvents(events, type) {
+    return events.filter(function (event) {
+      return event.type === type;
+    }).length;
+  }
+
+  function analyticsEventTitle(event) {
+    var labels = {
+      order_sent: "Gửi bếp",
+      voice_unclear: "Không nghe rõ",
+      voice_repeat: "Nói lại",
+      order_edit: "Sửa order",
+      order_deleted: "Xóa order",
+      employee_click: "Click nhân viên"
+    };
+    return labels[event.type] || event.type;
+  }
+
+  function analyticsEventDetail(event) {
+    var parts = [];
+    if (event.orderId) {
+      parts.push(event.orderId);
+    }
+    if (event.durationMs !== null && event.type === "order_sent") {
+      parts.push("thời gian " + formatDuration(event.durationMs));
+    }
+    if (event.repeats) {
+      parts.push("nói lại " + event.repeats + " lần");
+    }
+    if (event.command) {
+      parts.push(event.command);
+    }
+    if (event.target) {
+      parts.push(event.target);
+    }
+    if (event.source) {
+      parts.push(event.source);
+    }
+    return parts.length ? parts.join(" · ") : "Không có chi tiết.";
+  }
+
+  function formatDuration(ms) {
+    if (!Number.isFinite(Number(ms))) {
+      return "-";
+    }
+    var seconds = Number(ms) / 1000;
+    if (seconds < 60) {
+      return seconds.toFixed(seconds < 10 ? 1 : 0) + "s";
+    }
+    var minutes = Math.floor(seconds / 60);
+    var rest = Math.round(seconds % 60);
+    return minutes + "m " + rest + "s";
+  }
+
   function getItemUnitPrice(item) {
     var storedPrice = Number(item && item.unitPrice);
     if (storedPrice > 0) {
@@ -3160,10 +3589,30 @@
     els.meter.classList.toggle("is-active", kind === "listening" || kind === "processing");
   }
 
-  function nextOrderId() {
-    var sequence = parseInt(localStorage.getItem(STORAGE_KEYS.sequence) || "0", 10) + 1;
+  function nextOrderIdentity(businessDate) {
+    var sequenceDate = normalizeDateKey(businessDate) || todayDateKey();
+    var storedDate = localStorage.getItem(STORAGE_KEYS.sequenceDate) || "";
+    var storedSequence = parseInt(localStorage.getItem(STORAGE_KEYS.sequence) || "0", 10) || 0;
+    if (!storedDate && storedSequence > 0) {
+      storedDate = sequenceDate;
+    }
+    var sequence = storedDate === sequenceDate ? storedSequence : 0;
+    sequence += 1;
+    localStorage.setItem(STORAGE_KEYS.sequenceDate, sequenceDate);
     localStorage.setItem(STORAGE_KEYS.sequence, String(sequence));
-    return "ORD-" + String(sequence).padStart(4, "0");
+    return buildOrderIdentity(sequenceDate, sequence);
+  }
+
+  function buildOrderIdentity(sequenceDate, sequence) {
+    var cleanDate = normalizeDateKey(sequenceDate) || todayDateKey();
+    var cleanSequence = Math.max(1, Number(sequence) || 1);
+    var displayId = "ORD-" + String(cleanSequence).padStart(4, "0");
+    return {
+      id: "ORD-" + cleanDate.replace(/-/g, "") + "-" + String(cleanSequence).padStart(4, "0") + "-" + Date.now().toString(36),
+      displayId: displayId,
+      orderNumber: cleanSequence,
+      sequenceDate: cleanDate
+    };
   }
 
   function normalizeText(text) {
@@ -3193,27 +3642,54 @@
     return normalized.slice(wake.index + wake.length).trim();
   }
 
+  function textAfterWakePhrase(text) {
+    var normalized = normalizeText(text);
+    var wake = findWakePhrase(normalized);
+    if (!wake) {
+      return "";
+    }
+    return normalized.slice(wake.index + wake.length).trim();
+  }
+
   function findWakePhrase(text) {
     var normalized = normalizeText(text);
     var folded = foldText(normalized);
     var best = null;
 
-    WAKE_PHRASES.forEach(function (phrase) {
+    voiceCommandPhrases("wake").forEach(function (phrase) {
       var normalizedPhrase = normalizeText(phrase);
       var foldedPhrase = foldText(normalizedPhrase);
-      var normalizedIndex = normalized.indexOf(normalizedPhrase);
-      var foldedIndex = folded.indexOf(foldedPhrase);
-      var index = normalizedIndex !== -1 ? normalizedIndex : foldedIndex;
+      var normalizedMatch = findWholePhraseMatch(normalized, normalizedPhrase);
+      var foldedMatch = findWholePhraseMatch(folded, foldedPhrase);
+      var match = normalizedMatch || foldedMatch;
 
-      if (index !== -1 && (!best || index < best.index)) {
-        best = {
-          index: index,
-          length: normalizedIndex !== -1 ? normalizedPhrase.length : foldedPhrase.length
-        };
+      if (!match) {
+        return;
+      }
+
+      if (!best || match.index < best.index || (match.index === best.index && match.length > best.length)) {
+        best = match;
       }
     });
 
     return best;
+  }
+
+  function findWholePhraseMatch(source, phrase) {
+    if (!source || !phrase) {
+      return null;
+    }
+
+    var regex = new RegExp("(^|[^\\p{L}\\p{N}])(" + escapeRegex(phrase).replace(/\s+/g, "\\s+") + ")(?=$|[^\\p{L}\\p{N}])", "u");
+    var match = regex.exec(source);
+    if (!match) {
+      return null;
+    }
+
+    return {
+      index: match.index + match[1].length,
+      length: match[2].length
+    };
   }
 
   function containsCancelCommand(text) {
@@ -3226,6 +3702,15 @@
       "cancel order"
     ].some(function (phrase) {
       return folded.indexOf(phrase) !== -1;
+    });
+  }
+
+  function isBareVoiceCommand(text, type) {
+    var foldedText = stripLeadingCommandPunctuation(foldText(text || ""));
+    return voiceCommandPhrases(type).some(function (phrase) {
+      var foldedPhrase = foldText(phrase);
+      var regex = new RegExp("^" + escapeRegex(foldedPhrase).replace(/\s+/g, "\\s+") + "$", "u");
+      return regex.test(foldedText);
     });
   }
 

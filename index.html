@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#176f64">
     <title>Ghi Món Bằng Giọng Nói</title>
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="stylesheet" href="styles.css?v=voiceedit2">
+    <link rel="stylesheet" href="styles.css?v=micgate1">
   </head>
   <body>
     <div class="app-shell">
@@ -23,6 +23,7 @@
           <button class="tab is-active" type="button" data-view-button="waiter">Nhân viên</button>
           <button class="tab" type="button" data-view-button="kitchen">Bếp</button>
           <button class="tab" type="button" data-view-button="revenue">Doanh thu</button>
+          <button class="tab" type="button" data-view-button="dashboard">Dashboard</button>
           <button class="tab" type="button" data-view-button="menu">Menu</button>
         </nav>
       </header>
@@ -57,7 +58,7 @@
               </div>
 
               <div class="meter"><span id="meter-bar"></span></div>
-              <p class="voice-help" id="speech-support">Bấm Nói món, nói order. Nói "xong" để tách/cập nhật, "order 23 hoàn thành" để chuyển Xong, hoặc "xóa order 23".</p>
+              <p class="voice-help" id="speech-support">Bấm Nói món, rồi nói "ghi món sữa đá gửi" để gửi nhanh hoặc "ghi món sữa đá xong" để kiểm tra nháp.</p>
 
               <label class="field-label" for="transcript-input">Nội dung order</label>
               <textarea id="transcript-input" rows="7" spellcheck="false" autocapitalize="sentences" placeholder="Ví dụ: Ghi món, hai cà phê sữa đá và một bạc xỉu"></textarea>
@@ -151,7 +152,15 @@
               <span>Ngày</span>
               <input id="revenue-date" type="date">
             </label>
+            <button class="danger-action" type="button" id="reset-order-sequence-revenue" data-reset-order-sequence data-sequence-date-input="revenue-date">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+                <path d="M3 4v6h6"></path>
+              </svg>
+              Reset số order
+            </button>
           </div>
+          <div class="sync-banner" data-sequence-reset-feedback role="status" aria-live="polite">Số order tự reset khi qua ngày mới.</div>
 
           <section class="revenue-summary" aria-label="Tổng kết doanh thu">
             <div class="metric">
@@ -190,6 +199,66 @@
             </div>
             <div class="empty-state" id="revenue-empty">Chưa có order trong ngày này.</div>
             <div class="revenue-list" id="revenue-breakdown"></div>
+          </section>
+        </section>
+
+        <section class="view" id="dashboard-view" data-view="dashboard" aria-labelledby="dashboard-title">
+          <div class="view-header">
+            <div>
+              <h2 id="dashboard-title">Dashboard nội bộ</h2>
+              <p>Đo tốc độ ghi món, lỗi mic và thao tác trong ca.</p>
+            </div>
+            <label class="date-filter">
+              <span>Ngày</span>
+              <input id="dashboard-date" type="date">
+            </label>
+            <button class="danger-action" type="button" id="reset-order-sequence" data-reset-order-sequence data-sequence-date-input="dashboard-date">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+                <path d="M3 4v6h6"></path>
+              </svg>
+              Reset số order
+            </button>
+          </div>
+          <div class="sync-banner" id="sequence-reset-feedback" data-sequence-reset-feedback role="status" aria-live="polite">Số order tự reset khi qua ngày mới.</div>
+
+          <section class="revenue-summary dashboard-summary" aria-label="Số liệu vận hành">
+            <div class="metric">
+              <span>Order gửi bếp</span>
+              <strong id="dashboard-orders">0</strong>
+            </div>
+            <div class="metric">
+              <span>TB ghi món -> gửi</span>
+              <strong id="dashboard-avg-time">-</strong>
+            </div>
+            <div class="metric">
+              <span>Không nghe rõ</span>
+              <strong id="dashboard-unclear">0</strong>
+            </div>
+            <div class="metric">
+              <span>Sửa order</span>
+              <strong id="dashboard-edits">0</strong>
+            </div>
+            <div class="metric">
+              <span>Order bị xóa</span>
+              <strong id="dashboard-deleted">0</strong>
+            </div>
+            <div class="metric">
+              <span>Click nhân viên</span>
+              <strong id="dashboard-clicks">0</strong>
+            </div>
+            <div class="metric">
+              <span>Nói lại cùng order</span>
+              <strong id="dashboard-repeats">0</strong>
+            </div>
+          </section>
+
+          <section class="panel dashboard-panel" aria-labelledby="dashboard-events-title">
+            <div class="panel-heading">
+              <h3 id="dashboard-events-title">Event gần nhất</h3>
+            </div>
+            <div class="empty-state" id="dashboard-empty">Chưa có dữ liệu vận hành trong ngày này.</div>
+            <div class="dashboard-event-list" id="dashboard-events"></div>
           </section>
         </section>
 
@@ -246,6 +315,6 @@
       </main>
     </div>
 
-    <script src="app.js?v=voiceedit2"></script>
+    <script src="app.js?v=micgate1"></script>
   </body>
 </html>

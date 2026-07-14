@@ -79,6 +79,7 @@ const menuSizeOptions = {
 };
 
 const defaultVoiceCommands = {
+  wake: ["ghi món", "ghi mon", "nhận món", "nhan mon", "bếp ơi", "bep oi"],
   split: ["xong"],
   send: ["gửi bếp", "gui bep", "gửi", "gui", "ok", "okay", "ô kê", "o ke"],
   increase: ["tăng số", "tang so", "tăng", "tang", "cộng", "cong"],
@@ -90,6 +91,7 @@ const defaultVoiceCommands = {
 
 const defaultData = {
   sequence: 0,
+  sequenceDate: "",
   menu: applyMenuPrices([
     { id: "m_phin_den_da", name: "Phin Đen Đá", aliases: ["phin den da", "đen đá", "den da", "đen", "den", "cafe đen", "cafe phin đen đá", "cà phê phin đen đá"], active: true },
     { id: "m_phin_sua_da", name: "Phin Sữa Đá", aliases: ["phin sua da", "sữa", "sua", "sữa đá", "sua da", "cafe sữa", "cafe sua", "cà phê sữa", "ca phe sua", "cà phê sữa đá", "ca phe sua da", "cafe phin sữa đá", "cà phê phin sữa đá"], active: true },
@@ -125,7 +127,8 @@ const defaultData = {
     { id: "m_tra_oolong_cold_brew_mo_dao", name: "Trà Oolong Cold Brew Vị Mơ Đào", aliases: ["tra oolong cold brew vi mo dao", "oolong cold brew mơ đào"], active: true }
   ]),
   voiceCommands: defaultVoiceCommands,
-  orders: []
+  orders: [],
+  analytics: []
 };
 
 const mimeTypes = {
@@ -187,7 +190,10 @@ async function handleApi(request, response, requestUrl) {
         mode: "local-server",
         menu: data.menu,
         voiceCommands: data.voiceCommands,
-        orders: data.orders
+        orders: data.orders,
+        analytics: data.analytics,
+        sequence: data.sequence,
+        sequenceDate: data.sequenceDate
       });
       return;
     }
@@ -210,14 +216,18 @@ async function handleApi(request, response, requestUrl) {
         return;
       }
 
-      data.sequence += 1;
       const createdAt = new Date().toISOString();
+      const businessDate = cleanDateKey(body.businessDate) || dateKeyFromValue(createdAt);
+      const identity = nextOrderIdentity(data, businessDate);
       const order = {
-        id: `ORD-${String(data.sequence).padStart(4, "0")}`,
+        id: identity.id,
+        displayId: identity.displayId,
+        orderNumber: identity.orderNumber,
+        sequenceDate: identity.sequenceDate,
         createdAt,
         createdBy: cleanText(body.createdBy) || "Máy nhân viên",
         label: cleanText(body.label),
-        businessDate: cleanDateKey(body.businessDate) || dateKeyFromValue(createdAt),
+        businessDate,
         status: "new",
         hiddenFromKitchen: false,
         note: cleanText(body.note),
@@ -358,6 +368,34 @@ async function handleApi(request, response, requestUrl) {
       return;
     }
 
+    if (method === "POST" && pathname === "/api/analytics") {
+      const body = await readJsonBody(request);
+      const incoming = Array.isArray(body.events) ? body.events : [body];
+      const existingIds = new Set((data.analytics || []).map((event) => event.id));
+      const nextEvents = incoming
+        .map(normalizeAnalyticsEvent)
+        .filter((event) => event && !existingIds.has(event.id));
+
+      data.analytics = nextEvents.concat(data.analytics || []).slice(0, 5000);
+      writeData(data);
+      sendJson(response, 200, { analytics: data.analytics });
+      return;
+    }
+
+    if (method === "POST" && pathname === "/api/order-sequence/reset") {
+      const body = await readJsonBody(request);
+      const sequenceDate = cleanDateKey(body.sequenceDate) || dateKeyFromValue(new Date().toISOString());
+      data.sequenceDate = sequenceDate;
+      data.sequence = 0;
+      writeData(data);
+      sendJson(response, 200, {
+        sequence: data.sequence,
+        sequenceDate: data.sequenceDate,
+        nextDisplayId: "ORD-0001"
+      });
+      return;
+    }
+
     sendJson(response, 404, { error: "Not found." });
   } catch (error) {
     sendJson(response, 500, { error: error.message || "Server error." });
@@ -372,11 +410,25 @@ function readData() {
   try {
     const raw = fs.readFileSync(dataFile, "utf8");
     const data = JSON.parse(raw);
+    const orders = Array.isArray(data.orders) ? data.orders : [];
+    let sequence = Number(data.sequence) || 0;
+    let sequenceDate = cleanDateKey(data.sequenceDate);
+    const hasStoredSequenceDate = Boolean(sequenceDate);
+    if (!sequenceDate) {
+      const latestOrder = latestOrderByTime(orders);
+      sequenceDate = latestOrder ? orderDateKey(latestOrder) : (sequence > 0 ? dateKeyFromValue(new Date().toISOString()) : "");
+    }
+    if (!hasStoredSequenceDate && sequenceDate) {
+      sequence = Math.max(sequence, maxOrderNumberForDate(orders, sequenceDate));
+    }
+
     return {
-      sequence: Number(data.sequence) || 0,
+      sequence,
+      sequenceDate,
       menu: applyMenuPrices(Array.isArray(data.menu) ? data.menu : clone(defaultData.menu)),
       voiceCommands: normalizeVoiceCommands(data.voiceCommands),
-      orders: Array.isArray(data.orders) ? data.orders : []
+      orders,
+      analytics: normalizeAnalyticsEvents(data.analytics)
     };
   } catch (error) {
     return clone(defaultData);
@@ -430,6 +482,35 @@ function cleanDateKey(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
 }
 
+function latestOrderByTime(orders) {
+  return (orders || []).slice().sort((a, b) => {
+    return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
+  })[0] || null;
+}
+
+function orderDateKey(order) {
+  return cleanDateKey(order && order.sequenceDate) || cleanDateKey(order && order.businessDate) || dateKeyFromValue(order && order.createdAt);
+}
+
+function maxOrderNumberForDate(orders, sequenceDate) {
+  return (orders || []).reduce((max, order) => {
+    if (orderDateKey(order) !== sequenceDate) {
+      return max;
+    }
+    return Math.max(max, orderSequenceNumber(order));
+  }, 0);
+}
+
+function orderSequenceNumber(order) {
+  const directNumber = Number(order && order.orderNumber);
+  if (Number.isFinite(directNumber) && directNumber > 0) {
+    return directNumber;
+  }
+  const source = cleanText((order && (order.displayId || order.id)) || "");
+  const matches = source.match(/\d+/g);
+  return matches && matches.length ? Number(matches[matches.length - 1]) : 0;
+}
+
 function dateKeyFromValue(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -464,6 +545,23 @@ function normalizeOrderItems(menu, items) {
   });
 }
 
+function nextOrderIdentity(data, businessDate) {
+  const sequenceDate = cleanDateKey(businessDate) || dateKeyFromValue(new Date().toISOString());
+  if (data.sequenceDate !== sequenceDate) {
+    data.sequence = 0;
+    data.sequenceDate = sequenceDate;
+  }
+  data.sequence += 1;
+  const sequence = Math.max(1, Number(data.sequence) || 1);
+  const displayId = `ORD-${String(sequence).padStart(4, "0")}`;
+  return {
+    id: `ORD-${sequenceDate.replace(/-/g, "")}-${String(sequence).padStart(4, "0")}-${Date.now().toString(36)}`,
+    displayId,
+    orderNumber: sequence,
+    sequenceDate
+  };
+}
+
 function normalizeAliasList(values) {
   const seen = new Set();
   return (values || [])
@@ -491,6 +589,43 @@ function normalizeVoiceCommands(commands) {
     }
   });
   return normalized;
+}
+
+function normalizeAnalyticsEvents(events) {
+  const seen = new Set();
+  return (Array.isArray(events) ? events : [])
+    .map(normalizeAnalyticsEvent)
+    .filter((event) => {
+      if (!event || seen.has(event.id)) {
+        return false;
+      }
+      seen.add(event.id);
+      return true;
+    })
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+    .slice(0, 5000);
+}
+
+function normalizeAnalyticsEvent(event) {
+  const raw = event || {};
+  const at = cleanText(raw.at);
+  const parsedAt = at && !Number.isNaN(new Date(at).getTime()) ? at : new Date().toISOString();
+  const durationMs = Number(raw.durationMs);
+  const repeats = Number(raw.repeats);
+
+  return {
+    id: cleanText(raw.id) || `evt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    type: cleanText(raw.type) || "event",
+    at: parsedAt,
+    businessDate: cleanDateKey(raw.businessDate) || dateKeyFromValue(parsedAt),
+    orderId: cleanText(raw.orderId),
+    durationMs: Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : null,
+    repeats: Number.isFinite(repeats) && repeats >= 0 ? repeats : 0,
+    source: cleanText(raw.source),
+    command: cleanText(raw.command),
+    target: cleanText(raw.target),
+    device: cleanText(raw.device)
+  };
 }
 
 function normalizeText(value) {
