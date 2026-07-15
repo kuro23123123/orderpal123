@@ -577,17 +577,11 @@
 
       if (interimText.trim() && !voiceCommandProcessing) {
         var previewText = buildSpeechPreview(activeTranscript, interimText.trim());
-        if (listeningMode === "wake") {
-          var wakePreview = textAfterWakePhrase(previewText);
-          els.transcript.value = wakePreview ? wakePreview : "";
-          return;
-        }
-        if (listeningMode === "order" && !findWakePhrase(interimText) && isBareVoiceCommand(interimText, "send")) {
-          els.transcript.value = "";
+        if (listeningMode === "order" || listeningMode === "wake") {
+          els.transcript.value = previewContinuousOrderText(previewText);
           return;
         }
         els.transcript.value = previewText;
-        handleVoiceCommandIfPresent(previewText);
       }
 
       if (finalText.trim() && !voiceCommandProcessing) {
@@ -617,7 +611,7 @@
         if (recognition && listeningMode === "order") {
           try {
             recognition.start();
-            setVoiceState("Đang nghe", "listening");
+            setVoiceState("Nghe liên tục", "listening");
             setVoiceButtons(true);
           } catch (error) {
             setVoiceState("Không nghe rõ", "idle");
@@ -627,7 +621,7 @@
       }
     };
 
-    els.speechSupport.textContent = window.isSecureContext ? "Bấm Nói món, rồi nói 'ghi món sữa đá gửi' để gửi nhanh hoặc 'ghi món sữa đá xong' để kiểm tra nháp." : "Bấm Nói món. Nếu trình duyệt chặn mic trên HTTP, cần chạy bản HTTPS local.";
+    els.speechSupport.textContent = window.isSecureContext ? "Bấm Nói món, rồi nói một lượt: 'ghi món sữa đá gửi'." : "Bấm Nói món. Nếu trình duyệt chặn mic trên HTTP, cần chạy bản HTTPS local.";
     setVoiceState("Chờ", "idle");
     setVoiceButtons(false);
   }
@@ -640,9 +634,10 @@
     lastVoiceParseText = "";
     clearVoiceAutoFinishTimer();
     els.transcript.value = "";
-    listeningMode = "wake";
-    setVoiceState("Đang chờ", "listening");
-    els.speechSupport.textContent = "Đang chờ câu Ghi món.";
+    listeningMode = "order";
+    setVoiceState("Nghe liên tục", "listening");
+    setVoiceButtons(true);
+    els.speechSupport.textContent = "Mic đang nghe liên tục. Nói 'ghi món ... gửi' trong một câu.";
     startRecognition();
   }
 
@@ -654,10 +649,10 @@
     activeTranscript = "";
     voiceCommandProcessing = false;
     els.transcript.value = "";
-    listeningMode = "wake";
-    setVoiceState("Chờ ghi món", "listening");
+    listeningMode = "order";
+    setVoiceState("Nghe liên tục", "listening");
     setVoiceButtons(true);
-    els.speechSupport.textContent = "Đang nghe nhưng chưa ghi. Nói 'ghi món sữa đá gửi' để gửi nhanh hoặc 'ghi món sữa đá xong' để kiểm tra nháp.";
+    els.speechSupport.textContent = "Mic đang nghe liên tục. Nói một lượt: 'ghi món sữa đá gửi'. App chỉ lấy đoạn giữa 'ghi món' và 'gửi'.";
     startRecognition();
   }
 
@@ -693,7 +688,7 @@
     }
     if (listeningMode === "idle") {
       setVoiceState("Chờ", "idle");
-      els.speechSupport.textContent = SpeechRecognition ? "Bấm Nói món, rồi nói 'ghi món sữa đá gửi' để gửi nhanh hoặc 'ghi món sữa đá xong' để kiểm tra nháp." : els.speechSupport.textContent;
+      els.speechSupport.textContent = SpeechRecognition ? "Bấm Nói món, rồi nói một lượt: 'ghi món sữa đá gửi'." : els.speechSupport.textContent;
     }
     setVoiceButtons(false);
   }
@@ -842,7 +837,7 @@
       }
 
       parseActiveVoiceSegment("Đã nghe lệnh tách và tách đoạn vừa nói. Mic vẫn đang nghe.").then(function () {
-        restartOrderListeningAfterCommand(state.editingOrderId ? "Đã thêm vào order đang sửa. Nói tiếp để sửa thêm hoặc nói 'xong' để cập nhật bếp." : "Đã tách món. Nói món tiếp hoặc nói 'gửi'.");
+        restartOrderListeningAfterCommand(state.editingOrderId ? "Đã thêm vào order đang sửa. Nói tiếp để sửa thêm hoặc nói 'xong' để cập nhật bếp." : "Đã tách món. Nói món tiếp hoặc nói 'ghi món gửi'.");
       });
       return true;
     }
@@ -878,7 +873,7 @@
       })
       .catch(function () {
         if (listeningMode === "order") {
-          restartOrderListeningAfterCommand("Chưa gửi được bếp. Kiểm tra kết nối rồi nói 'gửi' lại.");
+          restartOrderListeningAfterCommand("Chưa gửi được bếp. Kiểm tra kết nối rồi nói 'ghi món gửi' lại.");
         }
       });
   }
@@ -1273,10 +1268,10 @@
       return;
     }
 
-    listeningMode = "wake";
-    setVoiceState("Chờ ghi món", "listening");
+    listeningMode = "order";
+    setVoiceState("Nghe liên tục", "listening");
     setVoiceButtons(true);
-    els.speechSupport.textContent = (message || "Mic vẫn đang nghe.") + " Chờ câu bắt đầu bằng 'ghi món'.";
+    els.speechSupport.textContent = (message || "Mic vẫn đang nghe.") + " Nói tiếp theo mẫu 'ghi món ... gửi'.";
     window.setTimeout(function () {
       voiceCommandProcessing = false;
     }, 260);
@@ -1795,39 +1790,88 @@
     return String(text || "").replace(/\s+/g, " ").trim();
   }
 
+  function previewContinuousOrderText(text) {
+    var sendWindow = findCompleteSendWindow(text);
+    if (sendWindow) {
+      return sendWindow.orderText;
+    }
+
+    var wakeSegment = findLatestWakeSegment(text);
+    return wakeSegment ? wakeSegment.text : "";
+  }
+
+  function findCompleteSendWindow(text) {
+    var normalized = normalizeText(text);
+    if (!normalized) {
+      return null;
+    }
+
+    var sendMatches = findVoicePhraseMatches("send", normalized);
+    if (!sendMatches.length) {
+      return null;
+    }
+
+    var wakeMatches = findVoicePhraseMatches("wake", normalized);
+    if (!wakeMatches.length) {
+      return null;
+    }
+
+    for (var i = 0; i < sendMatches.length; i += 1) {
+      var sendMatch = sendMatches[i];
+      var wakeBeforeSend = wakeMatches.filter(function (wakeMatch) {
+        return wakeMatch.end <= sendMatch.index;
+      }).pop();
+
+      if (!wakeBeforeSend) {
+        continue;
+      }
+
+      return {
+        wake: wakeBeforeSend,
+        send: sendMatch,
+        orderText: normalized.slice(wakeBeforeSend.end, sendMatch.index).trim(),
+        tail: normalized.slice(sendMatch.end).trim()
+      };
+    }
+
+    return null;
+  }
+
+  function findLatestWakeSegment(text) {
+    var normalized = normalizeText(text);
+    var wakeMatches = findVoicePhraseMatches("wake", normalized);
+    if (!wakeMatches.length) {
+      return null;
+    }
+
+    var wake = wakeMatches[wakeMatches.length - 1];
+    return {
+      wake: wake,
+      text: normalized.slice(wake.end).trim()
+    };
+  }
+
+  function trimContinuousVoiceBuffer(text) {
+    var normalized = normalizeSpeechChunk(text);
+    var wakeSegment = findLatestWakeSegment(normalized);
+    if (wakeSegment) {
+      return normalized.slice(wakeSegment.wake.index).trim();
+    }
+
+    var words = normalized.split(" ").filter(Boolean);
+    return words.slice(Math.max(0, words.length - 24)).join(" ");
+  }
+
   function handleFinalSpeech(text) {
     if (voiceCommandProcessing) {
       return;
-    }
-
-    if (listeningMode === "order") {
-      if (findWakePhrase(text)) {
-        startVoiceOrderSession();
-        activeTranscript = stripWakePhrase(text).trim();
-        els.transcript.value = activeTranscript;
-        setVoiceState("Ghi món", "listening");
-        if (activeTranscript && !handleVoiceCommandIfPresent(activeTranscript)) {
-          els.transcript.value = activeTranscript;
-        }
-        return;
-      }
-
-      if (isBareVoiceCommand(text, "send")) {
-        activeTranscript = "";
-        els.transcript.value = "";
-        listeningMode = "wake";
-        setVoiceState("Chờ ghi món", "listening");
-        setVoiceButtons(true);
-        els.speechSupport.textContent = "Đã bỏ qua lệnh gửi vì thiếu từ kích hoạt. Nói 'ghi món gửi' để gửi bếp.";
-        return;
-      }
     }
 
     var nextTranscript = appendSpeechPart(activeTranscript, text);
     if (nextTranscript === normalizeSpeechChunk(activeTranscript)) {
       return;
     }
-    activeTranscript = nextTranscript;
+    activeTranscript = trimContinuousVoiceBuffer(nextTranscript);
 
     if (containsCancelCommand(activeTranscript)) {
       clearDraft();
@@ -1835,41 +1879,79 @@
       return;
     }
 
-    if (listeningMode === "wake") {
-      var wake = findWakePhrase(activeTranscript);
-      if (!wake) {
-        els.transcript.value = "";
-        setVoiceState("Chờ ghi món", "listening");
-        els.speechSupport.textContent = "Mic đang bỏ qua tiếng nền. Nói 'ghi món' trước khi đọc order.";
-        return;
-      }
-
-      startVoiceOrderSession();
-      var afterWake = stripWakePhrase(activeTranscript);
-      if (afterWake.trim()) {
-        activeTranscript = afterWake.trim();
-        els.transcript.value = activeTranscript;
-        listeningMode = "order";
-        setVoiceState("Ghi món", "listening");
-        els.speechSupport.textContent = "Đã nghe 'ghi món'. Đang nhận phần sau từ khóa.";
-        if (!handleVoiceCommandIfPresent(activeTranscript)) {
-          els.transcript.value = activeTranscript;
-        }
-      } else {
-        activeTranscript = "";
-        els.transcript.value = "";
-        listeningMode = "order";
-        setVoiceState("Ghi món", "listening");
-        els.speechSupport.textContent = "Đã kích hoạt. Đọc order rồi nói 'xong'.";
-      }
+    if (listeningMode === "order" || listeningMode === "wake") {
+      handleContinuousVoiceBuffer();
       return;
     }
 
-    if (listeningMode === "order") {
-      if (!handleVoiceCommandIfPresent(activeTranscript)) {
-        els.transcript.value = activeTranscript;
-      }
+    els.transcript.value = activeTranscript;
+  }
+
+  function handleContinuousVoiceBuffer() {
+    var sendWindow = findCompleteSendWindow(activeTranscript);
+    if (sendWindow) {
+      processCompleteSendWindow(sendWindow);
+      return true;
     }
+
+    var wakeSegment = findLatestWakeSegment(activeTranscript);
+    if (!wakeSegment) {
+      activeTranscript = trimContinuousVoiceBuffer(activeTranscript);
+      els.transcript.value = "";
+      setVoiceState("Nghe liên tục", "listening");
+      els.speechSupport.textContent = "Mic đang nghe liên tục. App chỉ ghi khi nghe đủ 'ghi món ... gửi'.";
+      return false;
+    }
+
+    if (wakeSegment.wake.index > 0) {
+      activeTranscript = activeTranscript.slice(wakeSegment.wake.index).trim();
+      wakeSegment = findLatestWakeSegment(activeTranscript);
+    }
+
+    var segmentText = wakeSegment ? wakeSegment.text : "";
+    els.transcript.value = segmentText;
+    setVoiceState("Nghe liên tục", "listening");
+
+    if (!segmentText) {
+      els.speechSupport.textContent = "Đã nghe từ bắt đầu. Đọc món rồi nói 'gửi' trong cùng lượt.";
+      return false;
+    }
+
+    if (handleVoiceCommandIfPresent(segmentText)) {
+      return true;
+    }
+
+    els.speechSupport.textContent = "Đang giữ đoạn sau từ bắt đầu. Nói 'gửi' để gửi hoặc 'xong' để tách nháp.";
+    return false;
+  }
+
+  function processCompleteSendWindow(sendWindow) {
+    voiceCommandProcessing = true;
+    clearVoiceAutoFinishTimer();
+    startVoiceOrderSession();
+    activeTranscript = sendWindow.tail || "";
+    els.transcript.value = sendWindow.orderText;
+    setVoiceState("Đang tách", "processing");
+
+    if (!sendWindow.orderText) {
+      sendDraftByVoice();
+      return true;
+    }
+
+    parseAndSetDraft(sendWindow.orderText, {
+      append: Boolean(state.editingOrderId),
+      keepListening: true,
+      statusText: "Đã cắt đoạn giữa từ bắt đầu và lệnh gửi. Đang gửi bếp."
+    }).then(function (parseResult) {
+      var parsedItems = parseResult && parseResult.result && parseResult.result.items;
+      if (parseResult && parseResult.ok && parsedItems && parsedItems.length) {
+        sendDraftByVoice();
+        return;
+      }
+      recordVoiceUnclear(sendWindow.orderText);
+      restartOrderListeningAfterCommand("Không nghe rõ món giữa từ bắt đầu và lệnh gửi. Chưa gửi bếp.");
+    });
+    return true;
   }
 
   function parseAndSetDraft(rawText, options) {
@@ -3690,6 +3772,57 @@
       index: match.index + match[1].length,
       length: match[2].length
     };
+  }
+
+  function findVoicePhraseMatches(type, text) {
+    var normalized = normalizeText(text);
+    var folded = foldText(normalized);
+    var seen = {};
+    var matches = [];
+
+    voiceCommandPhrases(type).forEach(function (phrase) {
+      var normalizedPhrase = normalizeText(phrase);
+      var foldedPhrase = foldText(normalizedPhrase);
+      findWholePhraseMatches(normalized, normalizedPhrase).concat(findWholePhraseMatches(folded, foldedPhrase)).forEach(function (match) {
+        var key = match.index + "::" + match.end;
+        if (seen[key]) {
+          return;
+        }
+        seen[key] = true;
+        matches.push(match);
+      });
+    });
+
+    return matches.sort(function (a, b) {
+      if (a.index !== b.index) {
+        return a.index - b.index;
+      }
+      return b.length - a.length;
+    });
+  }
+
+  function findWholePhraseMatches(source, phrase) {
+    if (!source || !phrase) {
+      return [];
+    }
+
+    var matches = [];
+    var regex = new RegExp("(^|[^\\p{L}\\p{N}])(" + escapeRegex(phrase).replace(/\s+/g, "\\s+") + ")(?=$|[^\\p{L}\\p{N}])", "gu");
+    var match;
+    while ((match = regex.exec(source)) !== null) {
+      var index = match.index + match[1].length;
+      var length = match[2].length;
+      matches.push({
+        index: index,
+        length: length,
+        end: index + length
+      });
+      if (regex.lastIndex === match.index) {
+        regex.lastIndex += 1;
+      }
+    }
+
+    return matches;
   }
 
   function containsCancelCommand(text) {
