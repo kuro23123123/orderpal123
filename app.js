@@ -1685,7 +1685,7 @@
     var committedFolded = foldText(committed);
     var interimFolded = foldText(interim);
     if (!committedFolded || interimFolded.indexOf(committedFolded + " ") === 0 || interimFolded === committedFolded) {
-      return interim;
+      return collapseRepeatedCompletedVoiceWindows(interim);
     }
 
     return appendSpeechPart(committed, interim);
@@ -1718,7 +1718,32 @@
       return base;
     }
 
-    return normalizeSpeechChunk(base + " " + newWords.join(" "));
+    return collapseRepeatedCompletedVoiceWindows(normalizeSpeechChunk(base + " " + newWords.join(" ")));
+  }
+
+  function collapseRepeatedCompletedVoiceWindows(text) {
+    var normalized = normalizeSpeechChunk(text);
+    var originalWords = speechWords(normalized);
+    var foldedWords = speechWords(foldText(normalized));
+    var output = [];
+    var index = 0;
+
+    while (index < originalWords.length) {
+      var repeated = findRepeatedSpeechBlock(foldedWords, index);
+      var blockWords = originalWords.slice(index, index + repeated.unit);
+      var blockText = blockWords.join(" ");
+
+      if (repeated.count > 1 && findCompleteSendWindow(blockText)) {
+        output = output.concat(blockWords);
+        index += repeated.unit * repeated.count;
+        continue;
+      }
+
+      output = output.concat(originalWords.slice(index, index + repeated.unit));
+      index += repeated.unit;
+    }
+
+    return output.join(" ");
   }
 
   function collapseAdjacentRepeatedSpeech(text) {
