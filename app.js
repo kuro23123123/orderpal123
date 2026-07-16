@@ -17,6 +17,8 @@
   var activeTranscript = "";
   var voiceAutoFinishTimer = null;
   var lastVoiceParseText = "";
+  var lastFinalSpeechFingerprint = "";
+  var lastFinalSpeechAt = 0;
   var voiceCommandProcessing = false;
   var pendingWakeStartedAt = null;
   var activeOrderSession = null;
@@ -585,7 +587,12 @@
       }
 
       if (finalText.trim() && !voiceCommandProcessing) {
-        handleFinalSpeech(finalText.trim());
+        var finalSpeech = finalText.trim();
+        if (isRepeatedFinalSpeech(finalSpeech)) {
+          return;
+        }
+        rememberFinalSpeech(finalSpeech);
+        handleFinalSpeech(finalSpeech);
       }
     };
 
@@ -1803,6 +1810,20 @@
 
   function normalizeSpeechChunk(text) {
     return String(text || "").replace(/\s+/g, " ").trim();
+  }
+
+  function isRepeatedFinalSpeech(text) {
+    var fingerprint = finalSpeechFingerprint(text);
+    return Boolean(fingerprint && fingerprint === lastFinalSpeechFingerprint && Date.now() - lastFinalSpeechAt < 2800);
+  }
+
+  function rememberFinalSpeech(text) {
+    lastFinalSpeechFingerprint = finalSpeechFingerprint(text);
+    lastFinalSpeechAt = Date.now();
+  }
+
+  function finalSpeechFingerprint(text) {
+    return foldText(collapseRepeatedCompletedVoiceWindows(collapseAdjacentRepeatedSpeech(text || "")));
   }
 
   function findCompleteSendWindow(text) {
