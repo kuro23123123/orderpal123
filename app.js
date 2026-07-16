@@ -30,7 +30,20 @@
     decrease: ["giảm số", "giam so", "giảm", "giam", "bớt", "bot", "trừ", "tru"],
     remove: ["xóa món", "xoa mon", "xoá món", "xóa", "xoa", "xoá", "bỏ", "bo"],
     add: ["thêm món", "them mon", "thêm", "them"],
-    replace: ["đổi", "doi", "đổi món", "doi mon", "thay", "thay món", "thay mon"]
+    replace: ["đổi", "doi", "đổi món", "doi mon", "thay", "thay món", "thay mon"],
+    sizeS: ["size s", "size ét", "size nhỏ", "size nho", "ly nhỏ", "ly nho", "cỡ nhỏ", "co nho", "nhỏ", "nho"],
+    sizeM: ["size m", "size em", "size vừa", "size vua", "ly vừa", "ly vua", "cỡ vừa", "co vua"],
+    sizeL: ["size l", "size eo", "size lớn", "size lon", "ly lớn", "ly lon", "cỡ lớn", "co lon", "lớn", "lon"],
+    tasteNoSugar: ["không đường", "khong duong", "không ngọt", "khong ngot"],
+    tasteLessSweet: ["ít ngọt", "it ngot", "ít đường", "it duong", "bớt ngọt", "bot ngot"],
+    tasteSweet: ["ngọt", "ngot", "nhiều ngọt", "nhieu ngot", "nhiều đường", "nhieu duong"],
+    tasteSour: ["chua", "hơi chua", "hoi chua", "chua nhiều", "chua nhieu"],
+    tasteNormal: ["vừa", "vua", "bình thường", "binh thuong", "vừa ngọt", "vua ngot"],
+    iceLess: ["ít đá", "it da", "bớt đá", "bot da", "đá ít", "da it", "đá bớt", "da bot"],
+    iceMore: ["nhiều đá", "nhieu da", "thêm đá", "them da", "đá nhiều", "da nhieu", "đá thêm", "da them"],
+    iceNormal: ["đá vừa", "da vua", "vừa đá", "vua da", "bình thường", "binh thuong"],
+    prepCream: ["đánh kem", "danh kem"],
+    ownBottle: ["bình cá nhân", "binh ca nhan", "bình riêng", "binh rieng", "đựng trong bình", "dung trong binh", "dô trong bình", "do trong binh", "vô trong bình", "vo trong binh", "trong bình", "trong binh"]
   };
   var voiceCommandGroups = [
     { type: "wake", label: "Từ kích hoạt ghi món", hint: "Bắt buộc nói trước order hoặc lệnh. Ví dụ: ghi món, nhận món, bếp ơi" },
@@ -40,7 +53,20 @@
     { type: "decrease", label: "Giảm số món", hint: "Ví dụ: giảm, bớt" },
     { type: "remove", label: "Xóa món", hint: "Ví dụ: xóa, bỏ" },
     { type: "add", label: "Thêm món", hint: "Ví dụ: thêm món, thêm" },
-    { type: "replace", label: "Đổi món", hint: "Ví dụ: đổi, thay" }
+    { type: "replace", label: "Đổi món", hint: "Ví dụ: đổi, thay" },
+    { type: "sizeS", label: "Size S / nhỏ", hint: "Ví dụ: nhỏ, ly nhỏ, size s" },
+    { type: "sizeM", label: "Size M / vừa", hint: "Ví dụ: vừa, ly vừa, size m" },
+    { type: "sizeL", label: "Size L / lớn", hint: "Ví dụ: lớn, ly lớn, size l" },
+    { type: "tasteNoSugar", label: "Không đường", hint: "Ví dụ: không đường, không ngọt" },
+    { type: "tasteLessSweet", label: "Ít ngọt", hint: "Ví dụ: ít ngọt, bớt ngọt, ít đường" },
+    { type: "tasteSweet", label: "Ngọt", hint: "Ví dụ: ngọt, nhiều đường" },
+    { type: "tasteSour", label: "Chua", hint: "Ví dụ: chua, hơi chua" },
+    { type: "tasteNormal", label: "Vừa", hint: "Ví dụ: vừa, bình thường" },
+    { type: "iceLess", label: "Ít đá", hint: "Ví dụ: ít đá, bớt đá" },
+    { type: "iceMore", label: "Nhiều đá", hint: "Ví dụ: nhiều đá, thêm đá" },
+    { type: "iceNormal", label: "Đá vừa", hint: "Ví dụ: đá vừa, vừa đá" },
+    { type: "prepCream", label: "Đánh kem", hint: "Ví dụ: đánh kem" },
+    { type: "ownBottle", label: "Bình riêng", hint: "Ví dụ: bình riêng, bình cá nhân, vô trong bình" }
   ];
   var draftEditCommandTypes = ["increase", "decrease", "remove", "add", "replace"];
 
@@ -765,51 +791,7 @@
       return false;
     }
 
-    var deleteOrderCommand = findVoiceDeleteOrderCommand(rawText);
-    if (deleteOrderCommand) {
-      voiceCommandProcessing = true;
-      clearVoiceAutoFinishTimer();
-      activeTranscript = "";
-      els.transcript.value = deleteOrderCommand.rawRest;
-      deleteOrderByVoice(deleteOrderCommand.order)
-        .then(function (message) {
-          restartOrderListeningAfterCommand(message);
-        })
-        .catch(function () {
-          restartOrderListeningAfterCommand("Chưa xóa được order. Kiểm tra kết nối rồi nói lại.");
-      });
-      return true;
-    }
-
-    var completeOrderCommand = findVoiceCompleteOrderCommand(rawText);
-    if (completeOrderCommand) {
-      voiceCommandProcessing = true;
-      clearVoiceAutoFinishTimer();
-      activeTranscript = "";
-      els.transcript.value = completeOrderCommand.rawRest;
-      completeOrderByVoice(completeOrderCommand.order)
-        .then(function (message) {
-          restartOrderListeningAfterCommand(message);
-        })
-        .catch(function () {
-          restartOrderListeningAfterCommand("Chưa chuyển được order sang xong. Kiểm tra kết nối rồi nói lại.");
-        });
-      return true;
-    }
-
-    var sentOrderCommand = findSentOrderEditCommand(rawText);
-    if (sentOrderCommand) {
-      voiceCommandProcessing = true;
-      clearVoiceAutoFinishTimer();
-      activeTranscript = "";
-      els.transcript.value = sentOrderCommand.rawRest;
-      applySentOrderEditCommand(sentOrderCommand.order, sentOrderCommand.editCommand)
-        .then(function (message) {
-          restartOrderListeningAfterCommand(message);
-        })
-        .catch(function () {
-          restartOrderListeningAfterCommand("Chưa sửa được order đã gửi. Kiểm tra kết nối rồi nói lại.");
-        });
+    if (handleKitchenOrderCommandIfPresent(rawText, { allowEdits: true })) {
       return true;
     }
 
@@ -864,6 +846,59 @@
 
     sendDraftByVoice();
     return true;
+  }
+
+  function handleKitchenOrderCommandIfPresent(rawText, options) {
+    options = options || {};
+    var deleteOrderCommand = findVoiceDeleteOrderCommand(rawText);
+    if (deleteOrderCommand) {
+      voiceCommandProcessing = true;
+      clearVoiceAutoFinishTimer();
+      activeTranscript = "";
+      els.transcript.value = deleteOrderCommand.rawRest;
+      deleteOrderByVoice(deleteOrderCommand.order)
+        .then(function (message) {
+          restartOrderListeningAfterCommand(message);
+        })
+        .catch(function () {
+          restartOrderListeningAfterCommand("Chưa xóa được order. Kiểm tra kết nối rồi nói lại.");
+      });
+      return true;
+    }
+
+    var completeOrderCommand = findVoiceCompleteOrderCommand(rawText);
+    if (completeOrderCommand) {
+      voiceCommandProcessing = true;
+      clearVoiceAutoFinishTimer();
+      activeTranscript = "";
+      els.transcript.value = completeOrderCommand.rawRest;
+      completeOrderByVoice(completeOrderCommand.order)
+        .then(function (message) {
+          restartOrderListeningAfterCommand(message);
+        })
+        .catch(function () {
+          restartOrderListeningAfterCommand("Chưa chuyển được order sang xong. Kiểm tra kết nối rồi nói lại.");
+        });
+      return true;
+    }
+
+    var sentOrderCommand = options.allowEdits ? findSentOrderEditCommand(rawText) : null;
+    if (sentOrderCommand) {
+      voiceCommandProcessing = true;
+      clearVoiceAutoFinishTimer();
+      activeTranscript = "";
+      els.transcript.value = sentOrderCommand.rawRest;
+      applySentOrderEditCommand(sentOrderCommand.order, sentOrderCommand.editCommand)
+        .then(function (message) {
+          restartOrderListeningAfterCommand(message);
+        })
+        .catch(function () {
+          restartOrderListeningAfterCommand("Chưa sửa được order đã gửi. Kiểm tra kết nối rồi nói lại.");
+      });
+      return true;
+    }
+
+    return false;
   }
 
   function sendDraftByVoice() {
@@ -1911,6 +1946,10 @@
   }
 
   function handleContinuousVoiceBuffer() {
+    if (handleKitchenOrderCommandIfPresent(activeTranscript, { allowEdits: true })) {
+      return true;
+    }
+
     var sendWindow = findCompleteSendWindow(activeTranscript);
     if (sendWindow) {
       processCompleteSendWindow(sendWindow);
@@ -2123,7 +2162,7 @@
       });
     });
 
-    [itemNoteRules, iceNoteRules, sizeNoteRules, prepNoteRules, containerNoteRules].forEach(function (ruleSet) {
+    optionRuleSets().forEach(function (ruleSet) {
       ruleSet.forEach(function (rule) {
         rule.phrases.forEach(function (phrase) {
           foldText(phrase).split(" ").filter(Boolean).forEach(function (token) {
@@ -2235,11 +2274,11 @@
   }
 
   function extractTasteNote(segment) {
-    return extractOptionLabel(segment, itemNoteRules, DEFAULT_TASTE_NOTE);
+    return extractOptionLabel(segment, tasteNoteRules(), DEFAULT_TASTE_NOTE);
   }
 
   function extractIceNote(segment) {
-    var matches = collectOptionMatches(segment, iceNoteRules);
+    var matches = collectOptionMatches(segment, iceRules());
     if (!matches.length) {
       return DEFAULT_ICE_NOTE;
     }
@@ -2251,16 +2290,58 @@
   }
 
   function extractSizeNote(segment, fallback, itemLike) {
-    var requestedSize = extractOptionLabel(segment, sizeNoteRules, fallback || DEFAULT_SIZE_NOTE);
+    var requestedSize = extractOptionLabel(segment, sizeRules(), fallback || DEFAULT_SIZE_NOTE);
     return normalizeSizeForMenuItem(itemLike, requestedSize);
   }
 
   function extractPrepNote(segment) {
-    return extractAllOptionLabels(segment, prepNoteRules).join(", ");
+    return extractAllOptionLabels(segment, prepRules()).join(", ");
   }
 
   function extractContainerNote(segment) {
-    return extractOptionLabel(segment, containerNoteRules, "");
+    return extractOptionLabel(segment, containerRules(), "");
+  }
+
+  function optionRuleSets() {
+    return [tasteNoteRules(), iceRules(), sizeRules(), prepRules(), containerRules()];
+  }
+
+  function tasteNoteRules() {
+    return [
+      { label: "không đường", phrases: voiceCommandPhrases("tasteNoSugar") },
+      { label: "ít ngọt", phrases: voiceCommandPhrases("tasteLessSweet") },
+      { label: "ngọt", phrases: voiceCommandPhrases("tasteSweet") },
+      { label: "chua", phrases: voiceCommandPhrases("tasteSour") },
+      { label: "vừa", phrases: voiceCommandPhrases("tasteNormal") }
+    ];
+  }
+
+  function iceRules() {
+    return [
+      { label: "ít đá", phrases: voiceCommandPhrases("iceLess") },
+      { label: "nhiều đá", phrases: voiceCommandPhrases("iceMore") },
+      { label: "vừa", phrases: voiceCommandPhrases("iceNormal") }
+    ];
+  }
+
+  function sizeRules() {
+    return [
+      { label: "S", phrases: voiceCommandPhrases("sizeS") },
+      { label: "M", phrases: voiceCommandPhrases("sizeM") },
+      { label: "L", phrases: voiceCommandPhrases("sizeL") }
+    ];
+  }
+
+  function prepRules() {
+    return [
+      { label: "đánh kem", phrases: voiceCommandPhrases("prepCream") }
+    ];
+  }
+
+  function containerRules() {
+    return [
+      { label: "bình riêng", phrases: voiceCommandPhrases("ownBottle") }
+    ];
   }
 
   function extractOptionLabel(segment, rules, fallback) {

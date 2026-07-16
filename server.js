@@ -86,7 +86,20 @@ const defaultVoiceCommands = {
   decrease: ["giảm số", "giam so", "giảm", "giam", "bớt", "bot", "trừ", "tru"],
   remove: ["xóa món", "xoa mon", "xoá món", "xóa", "xoa", "xoá", "bỏ", "bo"],
   add: ["thêm món", "them mon", "thêm", "them"],
-  replace: ["đổi", "doi", "đổi món", "doi mon", "thay", "thay món", "thay mon"]
+  replace: ["đổi", "doi", "đổi món", "doi mon", "thay", "thay món", "thay mon"],
+  sizeS: ["size s", "size ét", "size nhỏ", "size nho", "ly nhỏ", "ly nho", "cỡ nhỏ", "co nho", "nhỏ", "nho"],
+  sizeM: ["size m", "size em", "size vừa", "size vua", "ly vừa", "ly vua", "cỡ vừa", "co vua"],
+  sizeL: ["size l", "size eo", "size lớn", "size lon", "ly lớn", "ly lon", "cỡ lớn", "co lon", "lớn", "lon"],
+  tasteNoSugar: ["không đường", "khong duong", "không ngọt", "khong ngot"],
+  tasteLessSweet: ["ít ngọt", "it ngot", "ít đường", "it duong", "bớt ngọt", "bot ngot"],
+  tasteSweet: ["ngọt", "ngot", "nhiều ngọt", "nhieu ngot", "nhiều đường", "nhieu duong"],
+  tasteSour: ["chua", "hơi chua", "hoi chua", "chua nhiều", "chua nhieu"],
+  tasteNormal: ["vừa", "vua", "bình thường", "binh thuong", "vừa ngọt", "vua ngot"],
+  iceLess: ["ít đá", "it da", "bớt đá", "bot da", "đá ít", "da it", "đá bớt", "da bot"],
+  iceMore: ["nhiều đá", "nhieu da", "thêm đá", "them da", "đá nhiều", "da nhieu", "đá thêm", "da them"],
+  iceNormal: ["đá vừa", "da vua", "vừa đá", "vua da", "bình thường", "binh thuong"],
+  prepCream: ["đánh kem", "danh kem"],
+  ownBottle: ["bình cá nhân", "binh ca nhan", "bình riêng", "binh rieng", "đựng trong bình", "dung trong binh", "dô trong bình", "do trong binh", "vô trong bình", "vo trong binh", "trong bình", "trong binh"]
 };
 
 const defaultData = {
