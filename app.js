@@ -18,6 +18,7 @@
   var voiceAutoFinishTimer = null;
   var lastVoiceParseText = "";
   var voiceCommandProcessing = false;
+  var recentVoiceWindowSignatures = [];
   var pendingWakeStartedAt = null;
   var activeOrderSession = null;
   var defaultVoiceCommands = {
@@ -1898,6 +1899,16 @@
   }
 
   function processCompleteSendWindow(sendWindow) {
+    var signature = voiceWindowSignature(sendWindow);
+    if (isRecentlyProcessedVoiceWindow(signature)) {
+      activeTranscript = sendWindow.tail || "";
+      els.transcript.value = buildProcessedTranscriptPreview(sendWindow);
+      setVoiceState("Đang nghe", "listening");
+      els.speechSupport.textContent = "Đã bỏ qua transcript lặp lại. Mic vẫn đang nghe.";
+      return true;
+    }
+
+    rememberProcessedVoiceWindow(signature);
     voiceCommandProcessing = true;
     clearVoiceAutoFinishTimer();
     startVoiceOrderSession();
@@ -1925,6 +1936,44 @@
       restartOrderListeningAfterCommand("Không nghe rõ món giữa từ bắt đầu và lệnh gửi. Chưa gửi bếp.");
     });
     return true;
+  }
+
+  function voiceWindowSignature(sendWindow) {
+    return foldText([
+      sendWindow && sendWindow.orderText,
+      state.editingOrderId || "new-order"
+    ].filter(Boolean).join(" "));
+  }
+
+  function isRecentlyProcessedVoiceWindow(signature) {
+    if (!signature) {
+      return false;
+    }
+
+    pruneRecentVoiceWindowSignatures();
+    return recentVoiceWindowSignatures.some(function (entry) {
+      return entry.signature === signature;
+    });
+  }
+
+  function rememberProcessedVoiceWindow(signature) {
+    if (!signature) {
+      return;
+    }
+
+    pruneRecentVoiceWindowSignatures();
+    recentVoiceWindowSignatures.unshift({
+      signature: signature,
+      at: Date.now()
+    });
+    recentVoiceWindowSignatures = recentVoiceWindowSignatures.slice(0, 12);
+  }
+
+  function pruneRecentVoiceWindowSignatures() {
+    var cutoff = Date.now() - 4500;
+    recentVoiceWindowSignatures = recentVoiceWindowSignatures.filter(function (entry) {
+      return entry.at >= cutoff;
+    });
   }
 
   function buildProcessedTranscriptPreview(sendWindow) {
