@@ -578,7 +578,7 @@
       if (interimText.trim() && !voiceCommandProcessing) {
         var previewText = buildSpeechPreview(activeTranscript, interimText.trim());
         if (listeningMode === "order" || listeningMode === "wake") {
-          els.transcript.value = previewContinuousOrderText(previewText);
+          els.transcript.value = previewText;
           return;
         }
         els.transcript.value = previewText;
@@ -611,7 +611,7 @@
         if (recognition && listeningMode === "order") {
           try {
             recognition.start();
-            setVoiceState("Nghe liên tục", "listening");
+            setVoiceState("Đang nghe", "listening");
             setVoiceButtons(true);
           } catch (error) {
             setVoiceState("Không nghe rõ", "idle");
@@ -635,7 +635,7 @@
     clearVoiceAutoFinishTimer();
     els.transcript.value = "";
     listeningMode = "order";
-    setVoiceState("Nghe liên tục", "listening");
+    setVoiceState("Đang nghe", "listening");
     setVoiceButtons(true);
     els.speechSupport.textContent = "Mic đang nghe liên tục. Nói 'ghi món ... gửi' trong một câu.";
     startRecognition();
@@ -650,7 +650,7 @@
     voiceCommandProcessing = false;
     els.transcript.value = "";
     listeningMode = "order";
-    setVoiceState("Nghe liên tục", "listening");
+    setVoiceState("Đang nghe", "listening");
     setVoiceButtons(true);
     els.speechSupport.textContent = "Mic đang nghe liên tục. Nói một lượt: 'ghi món sữa đá gửi'. App chỉ lấy đoạn giữa 'ghi món' và 'gửi'.";
     startRecognition();
@@ -738,6 +738,7 @@
     return parseAndSetDraft(text, {
       append: true,
       keepListening: listeningMode === "order",
+      keepVoiceState: listeningMode === "order",
       statusText: statusText || "Đã tách đoạn vừa nghe. Mic vẫn đang nghe."
     }).then(function (result) {
       var parsedItems = result && result.result && result.result.items;
@@ -1269,23 +1270,12 @@
     }
 
     listeningMode = "order";
-    setVoiceState("Nghe liên tục", "listening");
+    setVoiceState("Đang nghe", "listening");
     setVoiceButtons(true);
     els.speechSupport.textContent = (message || "Mic vẫn đang nghe.") + " Nói tiếp theo mẫu 'ghi món ... gửi'.";
     window.setTimeout(function () {
       voiceCommandProcessing = false;
-    }, 260);
-    if (recognition) {
-      try {
-        recognition.stop();
-      } catch (error) {
-        try {
-          recognition.start();
-        } catch (innerError) {
-          // The onend handler usually restarts recognition after stop().
-        }
-      }
-    }
+    }, 20);
   }
 
   function findDraftEditCommand(rawText) {
@@ -1790,16 +1780,6 @@
     return String(text || "").replace(/\s+/g, " ").trim();
   }
 
-  function previewContinuousOrderText(text) {
-    var sendWindow = findCompleteSendWindow(text);
-    if (sendWindow) {
-      return sendWindow.orderText;
-    }
-
-    var wakeSegment = findLatestWakeSegment(text);
-    return wakeSegment ? wakeSegment.text : "";
-  }
-
   function findCompleteSendWindow(text) {
     var normalized = normalizeText(text);
     if (!normalized) {
@@ -1829,6 +1809,7 @@
       return {
         wake: wakeBeforeSend,
         send: sendMatch,
+        sourceText: normalized,
         orderText: normalized.slice(wakeBeforeSend.end, sendMatch.index).trim(),
         tail: normalized.slice(sendMatch.end).trim()
       };
@@ -1851,15 +1832,10 @@
     };
   }
 
-  function trimContinuousVoiceBuffer(text) {
+  function trimTranscriptBuffer(text) {
     var normalized = normalizeSpeechChunk(text);
-    var wakeSegment = findLatestWakeSegment(normalized);
-    if (wakeSegment) {
-      return normalized.slice(wakeSegment.wake.index).trim();
-    }
-
     var words = normalized.split(" ").filter(Boolean);
-    return words.slice(Math.max(0, words.length - 24)).join(" ");
+    return words.slice(Math.max(0, words.length - 80)).join(" ");
   }
 
   function handleFinalSpeech(text) {
@@ -1871,7 +1847,8 @@
     if (nextTranscript === normalizeSpeechChunk(activeTranscript)) {
       return;
     }
-    activeTranscript = trimContinuousVoiceBuffer(nextTranscript);
+    activeTranscript = trimTranscriptBuffer(nextTranscript);
+    els.transcript.value = activeTranscript;
 
     if (containsCancelCommand(activeTranscript)) {
       clearDraft();
@@ -1896,21 +1873,16 @@
 
     var wakeSegment = findLatestWakeSegment(activeTranscript);
     if (!wakeSegment) {
-      activeTranscript = trimContinuousVoiceBuffer(activeTranscript);
-      els.transcript.value = "";
-      setVoiceState("Nghe liên tục", "listening");
-      els.speechSupport.textContent = "Mic đang nghe liên tục. App chỉ ghi khi nghe đủ 'ghi món ... gửi'.";
+      activeTranscript = trimTranscriptBuffer(activeTranscript);
+      els.transcript.value = activeTranscript;
+      setVoiceState("Đang nghe", "listening");
+      els.speechSupport.textContent = "Mic đang nghe liên tục. App chỉ gửi khi trong preview có đủ 'ghi món ... gửi'.";
       return false;
     }
 
-    if (wakeSegment.wake.index > 0) {
-      activeTranscript = activeTranscript.slice(wakeSegment.wake.index).trim();
-      wakeSegment = findLatestWakeSegment(activeTranscript);
-    }
-
     var segmentText = wakeSegment ? wakeSegment.text : "";
-    els.transcript.value = segmentText;
-    setVoiceState("Nghe liên tục", "listening");
+    els.transcript.value = activeTranscript;
+    setVoiceState("Đang nghe", "listening");
 
     if (!segmentText) {
       els.speechSupport.textContent = "Đã nghe từ bắt đầu. Đọc món rồi nói 'gửi' trong cùng lượt.";
@@ -1930,8 +1902,8 @@
     clearVoiceAutoFinishTimer();
     startVoiceOrderSession();
     activeTranscript = sendWindow.tail || "";
-    els.transcript.value = sendWindow.orderText;
-    setVoiceState("Đang tách", "processing");
+    els.transcript.value = buildProcessedTranscriptPreview(sendWindow);
+    setVoiceState("Đang nghe", "listening");
 
     if (!sendWindow.orderText) {
       sendDraftByVoice();
@@ -1941,6 +1913,7 @@
     parseAndSetDraft(sendWindow.orderText, {
       append: Boolean(state.editingOrderId),
       keepListening: true,
+      keepVoiceState: true,
       statusText: "Đã cắt đoạn giữa từ bắt đầu và lệnh gửi. Đang gửi bếp."
     }).then(function (parseResult) {
       var parsedItems = parseResult && parseResult.result && parseResult.result.items;
@@ -1954,11 +1927,17 @@
     return true;
   }
 
+  function buildProcessedTranscriptPreview(sendWindow) {
+    return sendWindow.sourceText || [sendWindow.orderText, sendWindow.tail].filter(Boolean).join(" ").trim();
+  }
+
   function parseAndSetDraft(rawText, options) {
     options = options || {};
     var text = stripWakePhrase(rawText || "");
     els.transcript.value = text;
-    setVoiceState("Đang tách", "processing");
+    if (!options.keepVoiceState) {
+      setVoiceState("Đang tách", "processing");
+    }
 
     return new Promise(function (resolve) {
       window.setTimeout(function () {
@@ -1970,7 +1949,9 @@
         renderDraft(result);
         scrollDraftIntoView();
         if (options.keepListening) {
-          setVoiceState("Đang nghe", "listening");
+          if (!options.keepVoiceState) {
+            setVoiceState("Đang nghe", "listening");
+          }
           els.speechSupport.textContent = "Không nghe rõ đoạn vừa nói. Mic vẫn đang nghe, hãy nói lại đoạn đó.";
         } else {
           setVoiceState("Không nghe rõ", "idle");
@@ -1992,7 +1973,9 @@
       renderDraft(result);
       scrollDraftIntoView();
       if (options.keepListening) {
-        setVoiceState("Đang nghe", "listening");
+        if (!options.keepVoiceState) {
+          setVoiceState("Đang nghe", "listening");
+        }
         els.speechSupport.textContent = options.statusText || "Đã tách món. Mic vẫn đang nghe.";
       } else {
         setVoiceState("Sẵn sàng", "idle");
