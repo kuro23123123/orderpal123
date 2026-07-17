@@ -140,6 +140,20 @@
     m_tra_oolong_cold_brew_mo_dao: ["L"]
   };
 
+  var HIDE_ORDER_SIZE_ITEM_IDS = [
+    "m_tra_sua_trams",
+    "m_hong_tra_sua",
+    "m_oolong_sua",
+    "m_oolong_chanh_mat_ong",
+    "m_hong_tra_dao",
+    "m_hong_tra_thao_moc",
+    "m_tra_lai_vai",
+    "m_tra_lai_dac_thom",
+    "m_tra_lai_cam_dac",
+    "m_tra_sen_cold_brew_tao",
+    "m_tra_oolong_cold_brew_mo_dao"
+  ];
+
   var defaultMenu = applyMenuPrices([
     { id: "m_phin_den_da", name: "Phin Đen Đá", aliases: ["phin den da", "đen đá", "den da", "đen", "den", "cafe đen", "cafe phin đen đá", "cà phê phin đen đá"], active: true },
     { id: "m_phin_sua_da", name: "Phin Sữa Đá", aliases: ["phin sua da", "sữa", "sua", "sữa đá", "sua da", "cafe sữa", "cafe sua", "cà phê sữa", "ca phe sua", "cà phê sữa đá", "ca phe sua da", "cafe phin sữa đá", "cà phê phin sữa đá"], active: true },
@@ -2410,6 +2424,7 @@
       return size;
     }
 
+    // S/L aliases mean the smallest/largest size this item actually sells.
     if (size === "S") {
       return supportedSizes[0];
     }
@@ -2612,7 +2627,7 @@
       row.innerHTML =
         '<div>' +
           '<div class="order-item-pair">' +
-            '<div class="order-item-cell order-item-name"><span>' + escapeHtml(item.name) + '</span><span class="size-badge">' + escapeHtml(itemSize) + '</span></div>' +
+            renderOrderItemNameCell(item, escapeHtml(item.name), itemSize) +
             '<div class="order-item-cell order-item-taste">' + escapeHtml(itemTaste) + '</div>' +
             '<div class="order-item-cell order-item-ice">' + escapeHtml(itemIce) + '</div>' +
           '</div>' +
@@ -3033,7 +3048,7 @@
       var itemPrep = renderItemPrepNote(item);
       return '<li>' +
         '<div class="order-item-pair">' +
-          '<div class="order-item-cell order-item-name"><span>' + item.quantity + " " + escapeHtml(item.name) + '</span><span class="size-badge">' + escapeHtml(itemSize) + '</span></div>' +
+          renderOrderItemNameCell(item, item.quantity + " " + escapeHtml(item.name), itemSize) +
           '<div class="order-item-cell order-item-taste">' + escapeHtml(itemTaste) + '</div>' +
           '<div class="order-item-cell order-item-ice">' + escapeHtml(itemIce) + '</div>' +
         '</div>' +
@@ -3078,6 +3093,19 @@
     });
 
     return card;
+  }
+
+  function renderOrderItemNameCell(item, escapedLabel, itemSize) {
+    var sizeBadge = shouldShowOrderSize(item)
+      ? '<span class="size-badge">' + escapeHtml(itemSize) + '</span>'
+      : "";
+    return '<div class="order-item-cell order-item-name"><span>' + escapedLabel + '</span>' + sizeBadge + '</div>';
+  }
+
+  function shouldShowOrderSize(item) {
+    var menuItem = findMenuItemForOrderItem(item);
+    var itemId = (menuItem && menuItem.id) || (item && item.id);
+    return HIDE_ORDER_SIZE_ITEM_IDS.indexOf(itemId) === -1;
   }
 
   function orderToneClass(order) {
