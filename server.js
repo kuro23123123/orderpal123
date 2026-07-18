@@ -548,6 +548,7 @@ function normalizeOrderItems(menu, items) {
       prep: cleanText(item.prep),
       ownBottle: Boolean(item.ownBottle) || cleanText(item.container) === "bình riêng",
       container: Boolean(item.ownBottle) || cleanText(item.container) === "bình riêng" ? "bình riêng" : "",
+      specialNote: cleanText(item.specialNote),
       note: cleanText(item.taste) || cleanText(item.note) || "vừa"
     };
 

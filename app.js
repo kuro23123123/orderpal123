@@ -69,6 +69,7 @@
     { type: "ownBottle", label: "Bình riêng", hint: "Ví dụ: bình riêng, bình cá nhân, vô trong bình" }
   ];
   var draftEditCommandTypes = ["increase", "decrease", "remove", "add", "replace"];
+  var SPECIAL_NOTE_MARKERS = ["ghi chú", "ghi chu"];
 
   var MENU_PRICES = {
     m_phin_den_da: { S: 16, M: 20 },
@@ -1251,6 +1252,7 @@
           ownBottle: isOwnBottleItem(item),
           container: isOwnBottleItem(item) ? "bình riêng" : "",
           unitPrice: getItemUnitPrice(item),
+          specialNote: item.specialNote || "",
           note: item.taste || item.note || DEFAULT_TASTE_NOTE
         };
       })
@@ -2104,8 +2106,11 @@
       matches = fuzzyMatches(foldedTokens, terms);
     }
 
-    attachItemNotes(matches, folded);
-    var clarity = analyzeRecognitionClarity(foldedTokens, matches, terms);
+    matches = filterMatchesInsideSpecialNotes(normalized, matches);
+    attachItemNotes(matches, normalized);
+    var clarityText = stripSpecialNoteContentsForClarity(normalized, matches);
+    var clarityTokens = foldText(clarityText).split(" ").filter(Boolean);
+    var clarity = analyzeRecognitionClarity(clarityTokens, matches, terms);
 
     return {
       items: clarity.tooUnclear ? [] : combineMatches(matches),
@@ -2219,6 +2224,7 @@
         position: start,
         end: end,
         hasCharRange: true,
+        termTokenCount: queryTerm.split(" ").filter(Boolean).length,
         defaultSize: defaultSizeForMenuItem(term.item)
       });
     }
@@ -2266,7 +2272,7 @@
     }).slice(0, 3);
   }
 
-  function attachItemNotes(matches, foldedText) {
+  function attachItemNotes(matches, normalizedText) {
     var orderedMatches = matches
       .filter(function (match) {
         return match.hasCharRange;
@@ -2277,14 +2283,175 @@
 
     orderedMatches.forEach(function (match, index) {
       var nextMatch = orderedMatches[index + 1];
-      var segmentEnd = nextMatch ? nextMatch.position : foldedText.length;
-      var noteSegment = foldedText.slice(match.end, segmentEnd);
-      match.taste = extractTasteNote(noteSegment);
-      match.ice = extractIceNote(noteSegment);
-      match.size = extractSizeNote(noteSegment, match.defaultSize, match);
-      match.prep = extractPrepNote(noteSegment);
-      match.ownBottle = extractContainerNote(noteSegment) === "bình riêng";
+      var segmentEnd = nextMatch ? nextMatch.position : normalizedText.length;
+      var noteSegment = normalizedText.slice(match.end, segmentEnd);
+      var noteParts = splitSpecialNoteSegment(noteSegment);
+      var regularSegment = noteParts.regularSegment;
+      match.taste = extractTasteNote(regularSegment);
+      match.ice = extractIceNote(regularSegment);
+      match.size = extractSizeNote(regularSegment, match.defaultSize, match);
+      match.prep = extractPrepNote(regularSegment);
+      match.ownBottle = extractContainerNote(regularSegment) === "bình riêng";
+      match.specialNote = noteParts.specialNote;
     });
+  }
+
+  function filterMatchesInsideSpecialNotes(normalizedText, matches) {
+    var orderedMatches = matches
+      .filter(function (match) {
+        return match.hasCharRange;
+      })
+      .sort(function (a, b) {
+        return a.position - b.position;
+      });
+    var suppressed = [];
+
+    orderedMatches.forEach(function (owner, ownerIndex) {
+      if (suppressed.indexOf(owner) !== -1) {
+        return;
+      }
+
+      var tail = normalizedText.slice(owner.end);
+      var noteParts = splitSpecialNoteSegment(tail);
+      if (!noteParts.hasMarker) {
+        return;
+      }
+
+      var markerStart = owner.end + noteParts.markerIndex;
+      var nextMatch = orderedMatches.slice(ownerIndex + 1).find(function (match) {
+        return suppressed.indexOf(match) === -1;
+      });
+      if (nextMatch && nextMatch.position < markerStart) {
+        return;
+      }
+
+      var boundary = orderedMatches.slice(ownerIndex + 1).find(function (match) {
+        return match.position > markerStart && isStrongMenuBoundaryMatch(match, normalizedText);
+      });
+      var noteEnd = boundary ? boundary.position : normalizedText.length;
+
+      orderedMatches.slice(ownerIndex + 1).forEach(function (match) {
+        if (match.position >= markerStart && match.position < noteEnd && suppressed.indexOf(match) === -1) {
+          suppressed.push(match);
+        }
+      });
+    });
+
+    return matches.filter(function (match) {
+      return suppressed.indexOf(match) === -1;
+    });
+  }
+
+  function stripSpecialNoteContentsForClarity(normalizedText, matches) {
+    var orderedMatches = matches
+      .filter(function (match) {
+        return match.hasCharRange;
+      })
+      .sort(function (a, b) {
+        return a.position - b.position;
+      });
+    var spans = [];
+
+    orderedMatches.forEach(function (match, index) {
+      var nextMatch = orderedMatches[index + 1];
+      var segmentEnd = nextMatch ? nextMatch.position : normalizedText.length;
+      var segment = normalizedText.slice(match.end, segmentEnd);
+      var noteParts = splitSpecialNoteSegment(segment);
+      if (noteParts.hasMarker) {
+        spans.push([match.end + noteParts.markerIndex, segmentEnd]);
+      }
+    });
+
+    return removeTextSpans(normalizedText, spans);
+  }
+
+  function splitSpecialNoteSegment(segment) {
+    var normalized = normalizeText(segment);
+    var marker = findSpecialNoteMarker(normalized);
+    if (!marker) {
+      return {
+        hasMarker: false,
+        markerIndex: -1,
+        markerEnd: -1,
+        regularSegment: normalized,
+        specialNote: ""
+      };
+    }
+
+    return {
+      hasMarker: true,
+      markerIndex: marker.index,
+      markerEnd: marker.end,
+      regularSegment: normalized.slice(0, marker.index).trim(),
+      specialNote: cleanSpecialNote(normalized.slice(marker.end))
+    };
+  }
+
+  function findSpecialNoteMarker(segment) {
+    var normalized = normalizeText(segment);
+    var folded = foldText(normalized);
+    var matches = [];
+
+    SPECIAL_NOTE_MARKERS.forEach(function (marker) {
+      var normalizedMarker = normalizeText(marker);
+      var foldedMarker = foldText(marker);
+      matches = matches
+        .concat(findWholePhraseMatches(normalized, normalizedMarker))
+        .concat(findWholePhraseMatches(folded, foldedMarker));
+    });
+
+    matches.sort(function (a, b) {
+      if (a.index !== b.index) {
+        return a.index - b.index;
+      }
+      return b.length - a.length;
+    });
+
+    return matches[0] || null;
+  }
+
+  function cleanSpecialNote(value) {
+    return normalizeText(value).replace(/^(la|là)\s+/u, "").trim();
+  }
+
+  function removeTextSpans(text, spans) {
+    if (!spans.length) {
+      return text;
+    }
+
+    spans.sort(function (a, b) {
+      return a[0] - b[0];
+    });
+
+    var result = "";
+    var cursor = 0;
+    spans.forEach(function (span) {
+      var start = Math.max(cursor, span[0]);
+      var end = Math.max(start, span[1]);
+      result += text.slice(cursor, start);
+      cursor = end;
+    });
+
+    return (result + text.slice(cursor)).replace(/\s+/g, " ").trim();
+  }
+
+  function isStrongMenuBoundaryMatch(match, normalizedText) {
+    if (!match || !match.hasCharRange) {
+      return false;
+    }
+
+    if ((Number(match.termTokenCount) || 0) >= 2) {
+      return true;
+    }
+
+    return hasExplicitQuantityBefore(normalizedText, match.position);
+  }
+
+  function hasExplicitQuantityBefore(text, index) {
+    var tokens = text.slice(0, index).trim().split(" ").filter(Boolean);
+    var last = tokens[tokens.length - 1];
+    var previous = tokens[tokens.length - 2];
+    return isQuantityToken(last) || (isCupClassifier(last) && isQuantityToken(previous));
   }
 
   function extractTasteNote(segment) {
@@ -2490,7 +2657,8 @@
       var itemSize = match.size || match.defaultSize || DEFAULT_SIZE_NOTE;
       var itemPrep = match.prep || "";
       var itemOwnBottle = Boolean(match.ownBottle);
-      var combineKey = match.id + "::" + itemSize + "::" + itemTaste + "::" + itemIce + "::" + itemPrep + "::" + itemOwnBottle;
+      var itemSpecialNote = match.specialNote || "";
+      var combineKey = match.id + "::" + itemSize + "::" + itemTaste + "::" + itemIce + "::" + itemPrep + "::" + itemOwnBottle + "::" + itemSpecialNote;
 
       if (!combined[combineKey]) {
         combined[combineKey] = {
@@ -2507,6 +2675,7 @@
           prep: itemPrep,
           ownBottle: itemOwnBottle,
           container: itemOwnBottle ? "bình riêng" : "",
+          specialNote: itemSpecialNote,
           note: itemTaste
         };
       }
@@ -2735,7 +2904,8 @@
       item.taste || item.note || DEFAULT_TASTE_NOTE,
       item.ice || DEFAULT_ICE_NOTE,
       item.prep || "",
-      isOwnBottleItem(item) ? "bình riêng" : ""
+      isOwnBottleItem(item) ? "bình riêng" : "",
+      item.specialNote || ""
     ].join("::");
   }
 
@@ -2846,6 +3016,7 @@
           ownBottle: isOwnBottleItem(item),
           container: isOwnBottleItem(item) ? "bình riêng" : "",
           unitPrice: getItemUnitPrice(item),
+          specialNote: item.specialNote || "",
           note: item.taste || item.note || DEFAULT_TASTE_NOTE
         };
       })
@@ -3134,8 +3305,9 @@
       var itemSize = normalizeSizeForMenuItem(item, item.size || DEFAULT_SIZE_NOTE);
       var itemPrep = item.prep || "";
       var itemOwnBottle = isOwnBottleItem(item);
+      var itemSpecialNote = item.specialNote || "";
       return {
-        draftKey: order.id + "::" + index + "::" + item.id + "::" + itemSize + "::" + itemTaste + "::" + itemIce + "::" + itemPrep + "::" + itemOwnBottle,
+        draftKey: order.id + "::" + index + "::" + item.id + "::" + itemSize + "::" + itemTaste + "::" + itemIce + "::" + itemPrep + "::" + itemOwnBottle + "::" + itemSpecialNote,
         id: item.id,
         name: item.name,
         quantity: Math.max(1, Number(item.quantity) || 1),
@@ -3148,6 +3320,7 @@
         prep: itemPrep,
         ownBottle: itemOwnBottle,
         container: itemOwnBottle ? "bình riêng" : "",
+        specialNote: itemSpecialNote,
         note: itemTaste
       };
     });
@@ -3169,6 +3342,9 @@
     }
     if (isOwnBottleItem(item)) {
       parts.push("bình riêng");
+    }
+    if (item.specialNote) {
+      parts.push(item.specialNote);
     }
     return parts.length ? '<div class="prep-note">Ghi chú: ' + escapeHtml(parts.join(", ")) + '</div>' : "";
   }
