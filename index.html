@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#176f64">
     <title>Ghi Món Bằng Giọng Nói</title>
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="stylesheet" href="styles.css?v=voiceattrs1">
+    <link rel="stylesheet" href="styles.css?v=configbackup1">
   </head>
   <body>
     <div class="app-shell">
@@ -270,6 +270,33 @@
             </div>
           </div>
 
+          <section class="panel config-backup-panel" aria-labelledby="config-backup-title">
+            <div class="panel-heading">
+              <h3 id="config-backup-title">Backup cấu hình</h3>
+            </div>
+            <p class="alias-help">Xuất file sau khi chỉnh từ nhận diện. Nếu Render reset dữ liệu, nhập lại file này để khôi phục menu và lệnh mic.</p>
+            <div class="control-row config-backup-actions">
+              <button class="primary-action" type="button" id="export-config">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <path d="M7 10l5 5 5-5"></path>
+                  <path d="M12 15V3"></path>
+                </svg>
+                Xuất cấu hình
+              </button>
+              <button type="button" id="import-config">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <path d="M17 8l-5-5-5 5"></path>
+                  <path d="M12 3v12"></path>
+                </svg>
+                Nhập cấu hình
+              </button>
+              <input id="import-config-file" type="file" accept=".json,application/json" hidden>
+            </div>
+            <div class="item-subtext" id="config-feedback" role="status" aria-live="polite">Chưa xuất file backup trong phiên này.</div>
+          </section>
+
           <section class="panel menu-editor" aria-labelledby="menu-editor-title">
             <div class="panel-heading">
               <h3 id="menu-editor-title">Thêm món</h3>
@@ -315,6 +342,6 @@
       </main>
     </div>
 
-    <script src="app.js?v=voiceattrs1"></script>
+    <script src="app.js?v=configbackup1"></script>
   </body>
 </html>

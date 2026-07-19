@@ -389,6 +389,15 @@ button svg {
   margin-bottom: 14px;
 }
 
+.config-backup-panel {
+  background: #f7fbf9;
+  border-color: #bfd8cf;
+}
+
+.config-backup-actions {
+  margin-top: 12px;
+}
+
 #parse-transcript {
   background: var(--primary);
   border-color: var(--primary);
@@ -509,6 +518,11 @@ input:focus {
   color: var(--muted);
   font-size: 13px;
   margin-top: 4px;
+}
+
+.item-subtext.is-warning {
+  color: #8d2d1f;
+  font-weight: 750;
 }
 
 .order-item-pair {

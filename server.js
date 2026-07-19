@@ -321,6 +321,31 @@ async function handleApi(request, response, requestUrl) {
       return;
     }
 
+    if (method === "PATCH" && pathname === "/api/config") {
+      const body = await readJsonBody(request);
+      const config = normalizeConfigPayload(body);
+
+      if (!config.menu && !config.voiceCommands) {
+        sendJson(response, 400, { error: "Config must include menu or voiceCommands." });
+        return;
+      }
+
+      if (config.menu) {
+        data.menu = config.menu;
+      }
+
+      if (config.voiceCommands) {
+        data.voiceCommands = config.voiceCommands;
+      }
+
+      writeData(data);
+      sendJson(response, 200, {
+        menu: data.menu,
+        voiceCommands: data.voiceCommands
+      });
+      return;
+    }
+
     if (method === "POST" && pathname === "/api/menu") {
       const body = await readJsonBody(request);
       const name = cleanText(body.name);
@@ -600,6 +625,69 @@ function normalizeVoiceCommands(commands) {
     const aliases = normalizeAliasList(values);
     if (aliases.length) {
       normalized[key] = aliases;
+    }
+  });
+  return normalized;
+}
+
+function normalizeConfigPayload(body) {
+  const source = body && body.config ? body.config : body;
+  const config = {};
+
+  if (Array.isArray(source && source.menu)) {
+    const menu = normalizeConfigMenu(source.menu);
+    if (menu.length) {
+      config.menu = menu;
+    }
+  }
+
+  if (source && source.voiceCommands && typeof source.voiceCommands === "object") {
+    config.voiceCommands = normalizeVoiceCommands(source.voiceCommands);
+  }
+
+  return config;
+}
+
+function normalizeConfigMenu(menu) {
+  return applyMenuPrices((menu || [])
+    .map(normalizeConfigMenuItem)
+    .filter(Boolean));
+}
+
+function normalizeConfigMenuItem(item) {
+  if (!item) {
+    return null;
+  }
+
+  const name = cleanText(item.name);
+  if (!name) {
+    return null;
+  }
+
+  const aliases = Array.isArray(item.aliases)
+    ? item.aliases
+    : String(item.aliases || "").split(/[,;\n]+/);
+  const normalizedItem = {
+    id: cleanText(item.id) || `m_${slugify(name)}`,
+    name,
+    aliases: normalizeAliasList(aliases),
+    active: item.active === false ? false : true
+  };
+  const prices = normalizeConfigPrices(item.prices);
+
+  if (Object.keys(prices).length) {
+    normalizedItem.prices = prices;
+  }
+
+  return normalizedItem;
+}
+
+function normalizeConfigPrices(prices) {
+  const normalized = {};
+  ["S", "M", "L"].forEach((size) => {
+    const value = prices && Number(prices[size]);
+    if (Number.isFinite(value) && value > 0) {
+      normalized[size] = value;
     }
   });
   return normalized;

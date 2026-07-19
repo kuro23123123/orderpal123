@@ -326,6 +326,10 @@
     els.menuList = document.getElementById("menu-list");
     els.voiceCommandList = document.getElementById("voice-command-list");
     els.saveVoiceCommands = document.getElementById("save-voice-commands");
+    els.exportConfig = document.getElementById("export-config");
+    els.importConfig = document.getElementById("import-config");
+    els.importConfigFile = document.getElementById("import-config-file");
+    els.configFeedback = document.getElementById("config-feedback");
     els.revenueDate = document.getElementById("revenue-date");
     els.revenueTotal = document.getElementById("revenue-total");
     els.revenueOrders = document.getElementById("revenue-orders");
@@ -383,6 +387,13 @@
       addMenuItem();
     });
     els.saveVoiceCommands.addEventListener("click", saveVoiceCommandAliases);
+    els.exportConfig.addEventListener("click", exportConfigBackup);
+    els.importConfig.addEventListener("click", function () {
+      els.importConfigFile.click();
+    });
+    els.importConfigFile.addEventListener("change", function () {
+      importConfigBackup(els.importConfigFile.files && els.importConfigFile.files[0]);
+    });
 
     window.addEventListener("storage", function (event) {
       if (event.key === STORAGE_KEYS.orders) {
@@ -3506,6 +3517,173 @@
     setSyncStatus("Đã lưu từ nhận diện lệnh mic trên thiết bị này.", "local");
   }
 
+  function exportConfigBackup() {
+    var config = buildConfigBackup();
+    var filename = "tram-cafe-config-" + todayDateKey() + ".json";
+    downloadJson(filename, config);
+    setConfigFeedback("Đã xuất " + filename + ". Giữ file này để khôi phục sau khi Render reset.", "online");
+  }
+
+  function importConfigBackup(file) {
+    if (!file) {
+      return;
+    }
+
+    file.text().then(function (raw) {
+      var imported = normalizeImportedConfig(JSON.parse(raw));
+      applyImportedConfig(imported);
+    }).catch(function () {
+      setConfigFeedback("File cấu hình không hợp lệ. Hãy chọn file JSON đã xuất từ app.", "local");
+    }).finally(function () {
+      els.importConfigFile.value = "";
+    });
+  }
+
+  function buildConfigBackup() {
+    return {
+      app: "tram-cafe-voice-order",
+      configVersion: 1,
+      exportedAt: new Date().toISOString(),
+      menu: state.menu.map(function (item) {
+        return sanitizeMenuItemForConfig(item);
+      }).filter(Boolean),
+      voiceCommands: clone(state.voiceCommands)
+    };
+  }
+
+  function applyImportedConfig(imported) {
+    if (imported.menu) {
+      state.menu = applyMenuPrices(imported.menu);
+      saveJson(STORAGE_KEYS.menu, state.menu);
+    }
+
+    if (imported.voiceCommands) {
+      state.voiceCommands = upgradeVoiceCommands(imported.voiceCommands);
+      saveJson(STORAGE_KEYS.voiceCommands, state.voiceCommands);
+    }
+
+    renderMenu();
+    renderVoiceCommandEditor();
+    renderRevenue();
+
+    if (state.serverMode) {
+      apiRequest("/api/config", {
+        method: "PATCH",
+        body: JSON.stringify(imported)
+      }).then(function (data) {
+        state.menu = applyMenuPrices(data.menu || state.menu);
+        state.voiceCommands = upgradeVoiceCommands(data.voiceCommands || state.voiceCommands);
+        saveJson(STORAGE_KEYS.menu, state.menu);
+        saveJson(STORAGE_KEYS.voiceCommands, state.voiceCommands);
+        renderMenu();
+        renderVoiceCommandEditor();
+        renderRevenue();
+        setConfigFeedback("Đã nhập cấu hình và lưu lên server hiện tại.", "online");
+        setSyncStatus("Đã khôi phục cấu hình từ file backup.", "online");
+      }).catch(function () {
+        setConfigFeedback("Đã nhập trên thiết bị này, nhưng chưa lưu được lên server.", "local");
+        setSyncStatus("Không kết nối được server. Cấu hình chỉ lưu trên máy này.", "local");
+      });
+      return;
+    }
+
+    setConfigFeedback("Đã nhập cấu hình trên thiết bị này.", "online");
+    setSyncStatus("Đã khôi phục cấu hình từ file backup trên thiết bị này.", "local");
+  }
+
+  function normalizeImportedConfig(rawConfig) {
+    var source = rawConfig && rawConfig.config ? rawConfig.config : rawConfig;
+    var imported = {};
+    var hasMenu = source && Array.isArray(source.menu);
+    var hasVoiceCommands = source && source.voiceCommands && typeof source.voiceCommands === "object";
+
+    if (hasMenu) {
+      imported.menu = sanitizeImportedMenu(source.menu);
+      if (!imported.menu.length) {
+        throw new Error("Imported menu has no valid items.");
+      }
+    }
+
+    if (hasVoiceCommands) {
+      imported.voiceCommands = upgradeVoiceCommands(source.voiceCommands);
+    }
+
+    if (!imported.menu && !imported.voiceCommands) {
+      throw new Error("Imported config has no menu or voice commands.");
+    }
+
+    return imported;
+  }
+
+  function sanitizeImportedMenu(menu) {
+    return menu.map(function (item) {
+      return sanitizeMenuItemForConfig(item);
+    }).filter(Boolean);
+  }
+
+  function sanitizeMenuItemForConfig(item) {
+    if (!item) {
+      return null;
+    }
+
+    var name = plainText(item.name);
+    if (!name) {
+      return null;
+    }
+
+    var id = plainText(item.id) || "m_" + slugify(name);
+    var aliases = Array.isArray(item.aliases)
+      ? normalizeAliasList(item.aliases.join(", "))
+      : normalizeAliasList(item.aliases || "");
+    var nextItem = {
+      id: id,
+      name: name,
+      aliases: aliases,
+      active: item.active === false ? false : true
+    };
+    var prices = sanitizeConfigPrices(item.prices);
+
+    if (Object.keys(prices).length) {
+      nextItem.prices = prices;
+    }
+
+    return nextItem;
+  }
+
+  function sanitizeConfigPrices(prices) {
+    var cleanPrices = {};
+    ["S", "M", "L"].forEach(function (size) {
+      var value = prices && Number(prices[size]);
+      if (Number.isFinite(value) && value > 0) {
+        cleanPrices[size] = value;
+      }
+    });
+    return cleanPrices;
+  }
+
+  function downloadJson(filename, data) {
+    var blob = new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(function () {
+      URL.revokeObjectURL(url);
+    }, 1000);
+  }
+
+  function setConfigFeedback(message, mode) {
+    if (!els.configFeedback) {
+      return;
+    }
+
+    els.configFeedback.textContent = message;
+    els.configFeedback.classList.toggle("is-warning", mode === "local");
+  }
+
   function renderRevenue() {
     if (!els.revenueBreakdown) {
       return;
@@ -4018,6 +4196,10 @@
       .replace(/[^\p{L}\p{N} ]+/gu, " ")
       .replace(/\s+/g, " ")
       .trim();
+  }
+
+  function plainText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
   }
 
   function foldText(text) {
